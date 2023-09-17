@@ -1,5 +1,6 @@
 import logging
 import click
+import datetime
 
 import app_config
 from influx_datastore import InfluxDatastore
@@ -12,17 +13,13 @@ logger = logging.getLogger("httpx")
 logger.setLevel(logging.WARNING)
 
 
-# site_code = "CLDP0452"
-# series = "PM25"
-# start = datetime.datetime(2023, 8, 20, 0, 0, 0)
-# end = datetime.datetime(2024, 1, 1, 0, 0, 0)
-
 @click.group()
 def cli():
     pass
 
+
 @cli.command()
-@click.option('--resync', required=False, default=False, is_flag=True)
+@click.option("--resync", required=False, default=False, is_flag=True)
 def sync_all(resync):
     """Synchronises data between Breathe London and our datastore"""
     datastore = InfluxDatastore(
@@ -39,9 +36,9 @@ def sync_all(resync):
 
 
 @cli.command()
-@click.argument('site_code', required=True)
-@click.argument('series', required=True)
-@click.option('--resync', required=False, default=False, is_flag=True)
+@click.argument("site_code", required=True)
+@click.argument("series", required=True)
+@click.option("--resync", required=False, default=False, is_flag=True)
 def sync(site_code, series, resync):
     """Synchronises data between Breathe London and our datastore"""
     datastore = InfluxDatastore(
@@ -55,5 +52,29 @@ def sync(site_code, series, resync):
     synchroniser = SiteSynchroniser(datastore, breathe_london)
     synchroniser.sync(site_code, series, resync)
 
-if __name__ == '__main__':
+
+@cli.command()
+@click.argument("site_code", required=True)
+@click.argument("series", required=True)
+@click.argument("start", required=True)
+@click.argument("end", required=True)
+def datastore_read(site_code, series, start, end):
+    """Reads data from the datastore"""
+    datastore = InfluxDatastore(
+        app_config.influx_host,
+        app_config.influx_token,
+        app_config.influx_org,
+        app_config.influx_database,
+    )
+
+    start_date = datetime.datetime.fromisoformat(start)
+    end_date = datetime.datetime.fromisoformat(end)
+
+    data = datastore.read_data(site_code, series, start_date, end_date)
+
+    for row in data:
+        print(str(row))
+
+
+if __name__ == "__main__":
     cli()

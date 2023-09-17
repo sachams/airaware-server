@@ -18,6 +18,7 @@ class InfluxDatastore:
         #                             error_callback=self.error,
         #                             retry_callback=self.retry,
         #                             WriteOptions=write_options)
+        # self.table = "test_table"
         logging.info(f"Connecting to {database} on {host} at {org}")
         self.client = InfluxDBClient3(
             host=host, token=token, org=org, database=database
@@ -32,8 +33,7 @@ class InfluxDatastore:
     # def retry(self, conf, data: str, exception: InfluxDBError):
     #     print(f"Retryable error occurs for batch: {conf}, data: {data} retry: {exception}")
 
-    @staticmethod
-    def _parse_row(series, row):
+    def _parse_row(self, series, row):
         """Extracts a single row of sensor data that is expected to be a dict in the format:
         {'SiteCode': 'CLDP0452',
         'DateTime': '2023-06-12T10:00:00.000Z',
@@ -42,38 +42,78 @@ class InfluxDatastore:
         """
         if row["ScaledValue"] is None:
             raise Exception(f"ScaledValue is None. Record is {row}")
-        
+
         if row["DateTime"] is None:
             raise Exception(f"DateTime is None. Record is {row}")
 
         return (
-            Point("sensor_data")
+            Point(series)
             .tag("site_code", row["SiteCode"])
-            .field(series, float(row["ScaledValue"]))
+            .field("value", float(row["ScaledValue"]))
             .time(row["DateTime"])
         )
 
-    @staticmethod
-    def _parse(series, data):
+    def _parse(self, series, data):
         """Converts the JSON input data into an array of InfluxDB Points"""
-        points = [InfluxDatastore._parse_row(series, row) for row in data if row["ScaledValue"] is not None]
+        points = [
+            self._parse_row(series, row)
+            for row in data
+            if row["ScaledValue"] is not None
+        ]
         return points
 
     def write_data(self, series, data):
         """Writes Breathe London series data to the database"""
-        points = InfluxDatastore._parse(series, data)
+        points = self._parse(series, data)
 
         self.client.write(record=points)
 
-        # for point in points:
-        #     print(f"Writing: {str(point)}")
-        #     self.client.write(record=[point])
+    @staticmethod
+    def _isoformat_utc(dt):
+        # The normal datetime.isoformat() doesn't include the timezone (Z = UTC)
+        # so add this now
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def read_data(self, site_code, series, start, end):
+        """Reads data from the datastore, and returns it in this format:
+        [
+            {
+                'time': '2023-06-12T10:00:00',
+                'value': 12.983285921708745
+            }
+        ]
+        """
+        query = (
+            "select time, value "
+            f'from "{series}" '
+            f"where site_code = '{site_code}' "
+            f"and time >= '{InfluxDatastore._isoformat_utc(start)}' "
+            f"and time < '{InfluxDatastore._isoformat_utc(end)}' "
+            "order by time asc"
+        )
+
+        try:
+            results = self.client.query(query=query, language="sql", mode="pandas")
+        except pa.lib.ArrowInvalid as e:
+            # This indicates the table can't be found
+            return []
+
+        data = []
+
+        for _, row in results.iterrows():
+            point = {
+                "time": row["time"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "value": row["value"],
+            }
+            data.append(point)
+
+        return data
 
     def get_latest_date(self, site_code, series):
         """Queries Influx to get the latest date of the given series"""
         query = (
-            f"select selector_last('{series}', time)['time']"
-            "from sensor_data "
+            f"select selector_last('value', time)['time']"
+            f"from {series} "
             f"where site_code = '{site_code}'"
         )
 

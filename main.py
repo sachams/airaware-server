@@ -1,29 +1,54 @@
-from fastapi import FastAPI
+import datetime
+import logging
+from fastapi import FastAPI, Response, status
+from breathe_london import BreatheLondon
 
-from influxdb_client_3 import InfluxDBClient3
+from influx_datastore import InfluxDatastore
 import app_config
 
-client = InfluxDBClient3(host=app_config.host, token=app_config.token, org=app_config.org)
+# Configure logging
+logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+logger = logging.getLogger("httpx")
+logger.setLevel(logging.WARNING)
+
+datastore = InfluxDatastore(
+    app_config.influx_host,
+    app_config.influx_token,
+    app_config.influx_org,
+    app_config.influx_database,
+)
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-    query = """SELECT *
-    FROM 'census'
-    WHERE time >= now() - interval '24 hours'
-    AND ('bees' IS NOT NULL OR 'ants' IS NOT NULL)"""
 
-    # Execute the query
-    table = client.query(query=query, database="test", language='sql')
+@app.get("/sensor/{site_code}/{series}/{start}/{end}")
+def get_sensor_data(
+    site_code: str,
+    series: str,
+    start: str,
+    end: str,
+    response: Response,
+):
+    if series != "NO2" and series != "PM25":
+        response = status.HTTP_400_BAD_REQUEST
+        return {"error": f"Invalid series {series}"}
 
-    # Convert to dataframe
-    df = table.to_pandas().sort_values(by="time")
-    print(df)
+    data = datastore.read_data(
+        site_code,
+        series,
+        datetime.datetime.fromisoformat(start),
+        datetime.datetime.fromisoformat(end),
+    )
 
-    return {"Hello": "World"}
+    return data
+
+
+@app.get("/sites")
+def get_sites():
+    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
+    return breathe_london.get_sites()
+
 
 @app.get("/healthcheck")
 def healthcheck():
-     return {"status": "ok"}
-
+    return {"status": "ok"}
