@@ -98,6 +98,36 @@ class InfluxDatastore:
             # This indicates the table can't be found
             return []
 
+        return self.format_results(results)
+
+    def read_average_data(self, series, start, end):
+        """Reads data from the datastore, averaging across all sites,
+        and returns it in this format:
+        [
+            {
+                'time': '2023-06-12T10:00:00',
+                'value': 12.983285921708745
+            }
+        ]
+        """
+        query = (
+            "select time, avg(value) as 'value' "
+            f'from "{series}" '
+            f"where time >= '{InfluxDatastore._isoformat_utc(start)}' "
+            f"and time < '{InfluxDatastore._isoformat_utc(end)}' "
+            "group by time "
+            "order by time asc"
+        )
+
+        try:
+            results = self.client.query(query=query, language="sql", mode="pandas")
+        except pa.lib.ArrowInvalid as e:
+            # This indicates the table can't be found
+            return []
+
+        return self.format_results(results)
+
+    def format_results(self, results):
         data = []
 
         for _, row in results.iterrows():
