@@ -56,7 +56,7 @@ class InfluxDatastore:
     @staticmethod
     def _parse(series, data):
         """Converts the JSON input data into an array of InfluxDB Points"""
-        points = [InfluxDatastore._parse_row(series, row) for row in data]
+        points = [InfluxDatastore._parse_row(series, row) for row in data if row["ScaledValue"] is not None]
         return points
 
     def write_data(self, series, data):
