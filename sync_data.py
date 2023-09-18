@@ -80,8 +80,10 @@ def datastore_read(site_code, series, start, end):
 @click.argument("series", required=True)
 @click.argument("start", required=True)
 @click.argument("end", required=True)
-def datastore_read_avg(series, start, end):
-    """Reads data from the datastore, averaging across all nodes"""
+@click.option("--site_code", "-s", multiple=True, required=False)
+def datastore_read_avg(series, start, end, site_code):
+    """Reads data from the datastore, averaging across all nodes, or optionally just
+    the specified nodes"""
     datastore = InfluxDatastore(
         app_config.influx_host,
         app_config.influx_token,
@@ -92,7 +94,7 @@ def datastore_read_avg(series, start, end):
     start_date = datetime.datetime.fromisoformat(start)
     end_date = datetime.datetime.fromisoformat(end)
 
-    data = datastore.read_average_data(series, start_date, end_date)
+    data = datastore.read_average_data(series, start_date, end_date, site_code)
 
     for row in data:
         print(str(row))

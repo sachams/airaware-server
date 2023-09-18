@@ -100,8 +100,9 @@ class InfluxDatastore:
 
         return self.format_results(results)
 
-    def read_average_data(self, series, start, end):
-        """Reads data from the datastore, averaging across all sites,
+    def read_average_data(self, series, start, end, site_codes):
+        """Reads data from the datastore, averaging across the specified sites. If no
+        sites are specified, it averages across all sites.
         and returns it in this format:
         [
             {
@@ -110,11 +111,20 @@ class InfluxDatastore:
             }
         ]
         """
+        site_clause = ""
+
+        if site_codes:
+            formatted_site_codes = ",".join(
+                [f"'{site_code}'" for site_code in site_codes]
+            )
+            site_clause = f"and site_code in ({formatted_site_codes})"
+
         query = (
             "select time, avg(value) as 'value' "
             f'from "{series}" '
             f"where time >= '{InfluxDatastore._isoformat_utc(start)}' "
             f"and time < '{InfluxDatastore._isoformat_utc(end)}' "
+            f"{site_clause} "
             "group by time "
             "order by time asc"
         )
