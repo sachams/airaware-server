@@ -3,10 +3,13 @@ import os
 import datetime
 import json
 import logging
+import time
 
 
 class BreatheLondon:
     def __init__(self, api_key):
+        self.max_retries = 3
+        self.retry_pause = 1
         self.client = httpx.Client(timeout=60)
         self.api_key = api_key
         self.base_url = "https://api.breathelondon.org/api"
@@ -16,8 +19,22 @@ class BreatheLondon:
         """Makes a GET request from the endpoint"""
         params = {"key": self.api_key}
         url = f"{self.base_url}/{endpoint}"
-        response = self.client.get(url, params=params)
-        return response.json()
+
+        retry_count = 0
+        while True:
+            try:
+                response = self.client.get(url, params=params)
+                return response.json()
+            except httpx.HTTPError as e:
+                if retry_count >= self.max_retries:
+                    logging.error(
+                        f"Caught exception while requesting data from API: {str(e)}. Retry limit reached"
+                    )
+                    raise
+
+                retry_count += 1
+                logging.warning(f"{str(e)}. Pausing {self.retry_pause}s before retry")
+                time.sleep(self.retry_pause)
 
     def _get_site_from_cache(self):
         try:
@@ -86,7 +103,7 @@ class BreatheLondon:
             #         1
             #     ],
             #     "returnValue": 0
-            # }            
+            # }
             return []
-        
+
         return data

@@ -20,7 +20,9 @@ def cli():
 
 @cli.command()
 @click.option("--resync", required=False, default=False, is_flag=True)
-def sync_all(resync):
+@click.option("--pause", required=False, default=5)
+@click.option("--start", required=False)
+def sync_all(resync, pause, start):
     """Synchronises data between Breathe London and our datastore"""
     datastore = InfluxDatastore(
         app_config.influx_host,
@@ -32,7 +34,7 @@ def sync_all(resync):
     breathe_london = BreatheLondon(app_config.breathe_london_api_key)
     synchroniser = SiteSynchroniser(datastore, breathe_london)
 
-    synchroniser.sync_all(resync)
+    synchroniser.sync_all(resync, pause, start)
 
 
 @cli.command()

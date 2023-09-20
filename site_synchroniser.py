@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 
 
 class SiteSynchroniser:
@@ -7,7 +8,7 @@ class SiteSynchroniser:
         self.datastore = datastore
         self.breathe_london = breathe_london
 
-    def sync_all(self, resync):
+    def sync_all(self, resync, pause, start):
         """Syncs all sites and series from BreatheLondon to the datastore"""
         logging.info("Loading all sites from BreatheLondon")
         all_sites = self.breathe_london.get_sites()[0]
@@ -16,8 +17,14 @@ class SiteSynchroniser:
         all_series = ["PM25", "NO2"]
 
         for site in all_sites:
+            if site["SiteCode"] < start:
+                logging.info(f"Skipping site {site['SiteCode']}")
+                continue
+
             for series in all_series:
-                self.sync(site["SiteCode"], series, False)
+                self.sync(site["SiteCode"], series, resync)
+                logging.info(f"Pausing for {pause}s")
+                time.sleep(pause)
 
     def sync(self, site_code, series, resync):
         """SYnchronises data from BL to the datastore by:
@@ -30,7 +37,9 @@ class SiteSynchroniser:
         else:
             logging.info(f"[{site_code}:{series}] Sync started")
 
-        latest_date = None if resync else self.datastore.get_latest_date(site_code, series)
+        latest_date = (
+            None if resync else self.datastore.get_latest_date(site_code, series)
+        )
 
         if latest_date is not None:
             logging.info(
