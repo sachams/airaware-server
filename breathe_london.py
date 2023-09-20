@@ -10,7 +10,7 @@ class BreatheLondon:
     def __init__(self, api_key):
         self.max_retries = 3
         self.retry_pause = 1
-        self.client = httpx.Client(timeout=60)
+        self.client = httpx.Client(timeout=30)
         self.api_key = api_key
         self.base_url = "https://api.breathelondon.org/api"
         self.site_cache_filename = "site_cache.json"
