@@ -68,6 +68,7 @@ def sync(site_code, series, resync):
 def datastore_read(series, start, end, site_code, frequency):
     """Reads data from the datastore, averaging across all nodes, or optionally just
     the specified node(s)"""
+
     datastore = InfluxDatastore(
         app_config.influx_host,
         app_config.influx_token,
