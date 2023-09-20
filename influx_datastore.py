@@ -148,8 +148,8 @@ class InfluxDatastore:
     def get_latest_date(self, site_code, series):
         """Queries Influx to get the latest date of the given series"""
         query = (
-            f"select selector_last('value', time)['time']"
-            f"from {series} "
+            f"select selector_last('value', time)['time'] "
+            f'from "{series}" '
             f"where site_code = '{site_code}'"
         )
 
