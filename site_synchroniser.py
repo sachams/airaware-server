@@ -17,7 +17,7 @@ class SiteSynchroniser:
         all_series = ["PM25", "NO2"]
 
         for site in all_sites:
-            if site["SiteCode"] < start:
+            if start is not None and site["SiteCode"] < start:
                 logging.info(f"Skipping site {site['SiteCode']}")
                 continue
 
