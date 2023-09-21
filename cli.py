@@ -20,7 +20,7 @@ def cli():
 
 @cli.command()
 @click.option("--resync", required=False, default=False, is_flag=True)
-@click.option("--pause", required=False, default=5)
+@click.option("--pause", required=False, default=2)
 @click.option("--start", required=False)
 def sync_all(resync, pause, start):
     """Synchronises data between Breathe London and our datastore"""
