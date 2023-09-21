@@ -29,34 +29,35 @@ class SensorData(BaseModel):
     value: float
 
 
-@app.get("/sensor/{site_code}/{series}/{start}/{end}")
+# @app.get("/sensor/{site_code}/{series}/{start}/{end}")
+# def get_sensor_data(
+#     site_code: str,
+#     series: str,
+#     start: str,
+#     end: str,
+#     response: Response,
+# ) -> list[SensorData]:
+#     """Returns sensor data for the specified node, series and time window"""
+#     if series != "NO2" and series != "PM25":
+#         response = status.HTTP_400_BAD_REQUEST
+#         return {"error": f"Invalid series {series}"}
+
+#     data = datastore.read_data(
+#         site_code,
+#         series,
+#         datetime.datetime.fromisoformat(start),
+#         datetime.datetime.fromisoformat(end),
+#     )
+
+#     return data
+
+
+@app.get("/sensor/{series}/{start}/{end}/{frequency}")
 def get_sensor_data(
-    site_code: str,
     series: str,
     start: str,
     end: str,
-    response: Response,
-) -> list[SensorData]:
-    """Returns sensor data for the specified node, series and time window"""
-    if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
-
-    data = datastore.read_data(
-        site_code,
-        series,
-        datetime.datetime.fromisoformat(start),
-        datetime.datetime.fromisoformat(end),
-    )
-
-    return data
-
-
-@app.get("/sensor_average/{series}/{start}/{end}")
-def get_sensor_data_average(
-    series: str,
-    start: str,
-    end: str,
+    frequency: str,
     response: Response,
     site: Annotated[list[str] | None, Query()] = None,
 ) -> list[SensorData]:
@@ -67,11 +68,16 @@ def get_sensor_data_average(
         response = status.HTTP_400_BAD_REQUEST
         return {"error": f"Invalid series {series}"}
 
-    data = datastore.read_average_data(
+    if frequency != "hourly" and frequency != "daily":
+        response = status.HTTP_400_BAD_REQUEST
+        return {"error": f"Invalid frequency {frequency}"}
+
+    data = datastore.read_data(
         series,
         datetime.datetime.fromisoformat(start),
         datetime.datetime.fromisoformat(end),
         site,
+        frequency,
     )
 
     return data
