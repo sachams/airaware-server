@@ -4,6 +4,7 @@ from fastapi import FastAPI, Response, status, Query
 from typing import Annotated
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 from influx_datastore import InfluxDatastore
 import app_config
@@ -21,6 +22,23 @@ datastore = InfluxDatastore(
 )
 
 app = FastAPI()
+
+origins = [
+    "https://airaware.static.observableusercontent.com",
+    "https://observablehq.com",
+    "http://localhost",
+    "http://localhost:8080",
+    "https://localhost",
+    "https://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class SensorData(BaseModel):
