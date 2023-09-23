@@ -137,11 +137,7 @@ class InfluxDatastore:
         data = []
 
         for _, row in results.iterrows():
-            point = {
-                "time": row["time"].strftime("%Y-%m-%dT%H:%M:%S"),
-                "value": row["value"],
-            }
-            data.append(point)
+            data.append((int(row["time"].timestamp() * 1000), row["value"]))
 
         return data
 

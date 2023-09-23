@@ -1,7 +1,7 @@
 import datetime
 import logging
 from fastapi import FastAPI, Response, status, Query
-from typing import Annotated
+from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,33 +41,12 @@ app.add_middleware(
 )
 
 
-class SensorData(BaseModel):
-    # TODO: standardise dt return type. With Z?
-    time: datetime.datetime
-    value: float
+def sanitise_timestamp(dt):
+    """Sanitises datetime inputs"""
 
-
-# @app.get("/sensor/{site_code}/{series}/{start}/{end}")
-# def get_sensor_data(
-#     site_code: str,
-#     series: str,
-#     start: str,
-#     end: str,
-#     response: Response,
-# ) -> list[SensorData]:
-#     """Returns sensor data for the specified node, series and time window"""
-#     if series != "NO2" and series != "PM25":
-#         response = status.HTTP_400_BAD_REQUEST
-#         return {"error": f"Invalid series {series}"}
-
-#     data = datastore.read_data(
-#         site_code,
-#         series,
-#         datetime.datetime.fromisoformat(start),
-#         datetime.datetime.fromisoformat(end),
-#     )
-
-#     return data
+    # If the format includes milliseconds, strip them
+    # eg, 2023-08-23T00:00:00.000Z
+    return dt.split(".")[0]
 
 
 @app.get("/sensor/{series}/{start}/{end}/{frequency}")
@@ -78,22 +57,24 @@ def get_sensor_data(
     frequency: str,
     response: Response,
     site: Annotated[list[str] | None, Query()] = None,
-) -> list[SensorData]:
+) -> list[Tuple[int, float]]:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
+    series = series.upper()
     if series != "NO2" and series != "PM25":
         response = status.HTTP_400_BAD_REQUEST
         return {"error": f"Invalid series {series}"}
 
+    frequency = frequency.lower()
     if frequency != "hourly" and frequency != "daily":
         response = status.HTTP_400_BAD_REQUEST
         return {"error": f"Invalid frequency {frequency}"}
 
     data = datastore.read_data(
         series,
-        datetime.datetime.fromisoformat(start),
-        datetime.datetime.fromisoformat(end),
+        datetime.datetime.fromisoformat(sanitise_timestamp(start)),
+        datetime.datetime.fromisoformat(sanitise_timestamp(end)),
         site,
         frequency,
     )
