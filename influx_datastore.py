@@ -126,9 +126,11 @@ class InfluxDatastore:
                 raise Exception(f"Unknown frequency {frequency}")
 
         try:
+            logging.info(f"Running query: {query}")
             results = self.client.query(query=query, language="sql", mode="pandas")
         except pa.lib.ArrowInvalid as e:
             # This indicates the table can't be found
+            logging.warning(f"Caught exception {str(e)}")
             return []
 
         return self.format_results(results)

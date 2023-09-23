@@ -1,1 +1,1 @@
-python cli.py sync-all 
+python cli.py sync-all --pause 0
