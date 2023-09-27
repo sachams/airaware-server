@@ -5,6 +5,7 @@ from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from enricher import Enricher
 
 from influx_datastore import InfluxDatastore
 import app_config
@@ -82,8 +83,38 @@ def get_sensor_data(
     return data
 
 
-@app.get("/sites")
-def get_sites():
+@app.get("/site_average/{series}/{start}/{end}")
+def get_site_average(
+    series: str,
+    start: str,
+    end: str,
+    response: Response,
+    enrich: bool = True,
+) -> list[dict]:
+    """Returns the list of all sites with the average levels for the periods given"""
+    series = series.upper()
+    if series != "NO2" and series != "PM25":
+        response = status.HTTP_400_BAD_REQUEST
+        return {"error": f"Invalid series {series}"}
+
+    data = datastore.read_site_average(
+        series,
+        datetime.datetime.fromisoformat(sanitise_timestamp(start)),
+        datetime.datetime.fromisoformat(sanitise_timestamp(end)),
+    )
+
+    if not enrich:
+        return data
+
+    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
+    site_metadata = breathe_london.get_sites()
+    enriched_data = Enricher.enrich(site_metadata, data)
+
+    return enriched_data
+
+
+@app.get("/site_info")
+def get_site_info():
     """Returns the list of all sites from the Breathe London API. Note
     that the site list is cached for 24h"""
     breathe_london = BreatheLondon(app_config.breathe_london_api_key)

@@ -1,5 +1,6 @@
 import logging
 import pyarrow as pa
+import datetime
 
 from influxdb_client_3 import (
     InfluxDBClient3,
@@ -133,13 +134,39 @@ class InfluxDatastore:
             logging.warning(f"Caught exception {str(e)}")
             return []
 
-        return self.format_results(results)
-
-    def format_results(self, results):
         data = []
 
         for _, row in results.iterrows():
             data.append((int(row["time"].timestamp() * 1000), row["value"]))
+
+        return data
+
+    def read_site_average(self, series, start, end):
+        """Reads data from the datastore, returning the average of all sites
+        across the specified time period
+        """
+
+        query = (
+            "select site_code, avg(value) as 'value' "
+            f'from "{series}" '
+            f"where time >= '{InfluxDatastore._isoformat_utc(start)}' "
+            f"and time < '{InfluxDatastore._isoformat_utc(end)}' "
+            "group by site_code "
+            "order by site_code asc"
+        )
+
+        try:
+            logging.info(f"Running query: {query}")
+            results = self.client.query(query=query, language="sql", mode="pandas")
+        except pa.lib.ArrowInvalid as e:
+            # This indicates the table can't be found
+            logging.warning(f"Caught exception {str(e)}")
+            return []
+
+        data = []
+
+        for _, row in results.iterrows():
+            data.append({"site_code": row["site_code"], "value": row["value"]})
 
         return data
 

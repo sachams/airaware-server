@@ -70,7 +70,7 @@ class BreatheLondon:
             return site_list
 
         logging.info("Loading site list from API")
-        site_list = self._get("ListSensors")
+        site_list = self._get("ListSensors")[0]
 
         self._save_site_cache(site_list)
 

@@ -519,6 +519,23 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pydash"
+version = "7.0.6"
+description = "The kitchen sink of Python utility libraries for doing \"stuff\" in a functional way. Based on the Lo-Dash Javascript library."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pydash-7.0.6-py3-none-any.whl", hash = "sha256:10e506935953fde4b0d6fe21a88e17783cd1479256ae96f285b5f89063b4efd6"},
+    {file = "pydash-7.0.6.tar.gz", hash = "sha256:7d9df7e9f36f2bbb08316b609480e7c6468185473a21bdd8e65dda7915565a26"},
+]
+
+[package.dependencies]
+typing-extensions = ">=3.10,<4.6.0 || >4.6.0"
+
+[package.extras]
+dev = ["Sphinx", "black", "build", "coverage", "docformatter", "flake8", "flake8-black", "flake8-bugbear", "flake8-isort", "furo", "importlib-metadata (<5)", "invoke", "isort", "mypy", "pylint", "pytest", "pytest-cov", "pytest-mypy-testing", "sphinx-autodoc-typehints", "tox", "twine", "wheel"]
+
+[[package]]
 name = "pygments"
 version = "2.16.1"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -731,4 +748,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "db3629d01f0a43f68b37c4646a6e61104400252de7aedecbfae3e861f0abc3ee"
+content-hash = "096d28f3b2893aba23d27c428d53785fc60e8d5e758fde34effaf95df05a4014"
