@@ -42,6 +42,12 @@ app.add_middleware(
 )
 
 
+class SensorData(BaseModel):
+    # TODO: standardise dt return type. With Z?
+    time: datetime.datetime
+    value: float
+
+
 def sanitise_timestamp(dt):
     """Sanitises datetime inputs"""
 
@@ -58,7 +64,7 @@ def get_sensor_data(
     frequency: str,
     response: Response,
     site: Annotated[list[str] | None, Query()] = None,
-) -> list[Tuple[int, float]]:
+) -> list[SensorData]:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
