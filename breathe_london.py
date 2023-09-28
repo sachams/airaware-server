@@ -13,7 +13,7 @@ class BreatheLondon:
         self.client = httpx.Client(timeout=30)
         self.api_key = api_key
         self.base_url = "https://api.breathelondon.org/api"
-        self.site_cache_filename = "site_cache.json"
+        self.site_cache_filename = "/data/site_cache.json"
 
     def _get(self, endpoint):
         """Makes a GET request from the endpoint"""
@@ -39,7 +39,7 @@ class BreatheLondon:
     def _get_site_from_cache(self):
         try:
             if os.path.exists(self.site_cache_filename):
-                logging.info(f"Found site cache")
+                logging.info(f"Found site cache at {self.site_cache_filename}")
                 one_day_ago = datetime.datetime.utcnow() + datetime.timedelta(days=-1)
                 cache_modified = datetime.datetime.fromtimestamp(
                     os.path.getmtime(self.site_cache_filename)
@@ -57,7 +57,7 @@ class BreatheLondon:
         return None
 
     def _save_site_cache(self, site_list):
-        logging.info("Saving site list to cache")
+        logging.info(f"Saving site list to cache at {self.site_cache_filename}")
         with open(self.site_cache_filename, "w") as cache:
             json.dump(site_list, cache)
 
