@@ -34,7 +34,7 @@ class InfluxDatastore:
     # def retry(self, conf, data: str, exception: InfluxDBError):
     #     print(f"Retryable error occurs for batch: {conf}, data: {data} retry: {exception}")
 
-    def _parse_data_row(self, series, row):
+    def _parse_row(self, series, row):
         """Extracts a single row of sensor data that is expected to be a dict in the format:
         {'SiteCode': 'CLDP0452',
         'DateTime': '2023-06-12T10:00:00.000Z',

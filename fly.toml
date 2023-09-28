@@ -19,3 +19,12 @@ primary_region = "lhr"
 [mounts]
   source="machine_data"
   destination="/data"
+
+[processes]
+  # The command below is used to launch a Rails server; be sure to
+  # replace with the command you're using to launch your server.
+  app = "uvicorn main:app --host 0.0.0.0 --port 8080"
+  cron = "supercronic /app/crontab"
+
+[[services]]
+  processes = ["app"]

@@ -10,8 +10,8 @@ class SiteSynchroniser:
 
     def sync_all(self, resync, pause, start):
         """Syncs all sites and series from BreatheLondon to the datastore"""
-        logging.info("Loading all sites from BreatheLondon")
-        all_sites = self.breathe_london.get_sites()[0]
+        logging.info("*** Starting BreatheLondon sync ***")
+        all_sites = self.breathe_london.get_sites()
         logging.info(f"Found {len(all_sites)} sites")
 
         all_series = ["PM25", "NO2"]
@@ -25,6 +25,8 @@ class SiteSynchroniser:
                 self.sync(site["SiteCode"], series, resync)
                 logging.info(f"Pausing for {pause}s")
                 time.sleep(pause)
+
+        logging.info("*** BreatheLondon sync complete ***")
 
     def sync(self, site_code, series, resync):
         """SYnchronises data from BL to the datastore by:

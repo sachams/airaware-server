@@ -1,1 +1,1 @@
-30 * * * * python cli.py sync-all
+0 0 * * * python cli.py sync-all

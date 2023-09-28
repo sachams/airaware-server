@@ -58,8 +58,11 @@ class BreatheLondon:
 
     def _save_site_cache(self, site_list):
         logging.info(f"Saving site list to cache at {self.site_cache_filename}")
-        with open(self.site_cache_filename, "w") as cache:
-            json.dump(site_list, cache)
+        try:
+            with open(self.site_cache_filename, "w") as cache:
+                json.dump(site_list, cache)
+        except FileNotFoundError:
+            logging.warning("Unable to save sites to cache")
 
     def get_sites(self):
         """Requests a list of sites from Breathe London and returns list of sites"""
