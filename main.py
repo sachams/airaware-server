@@ -5,7 +5,6 @@ from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from enricher import Enricher
 
 from influx_datastore import InfluxDatastore
 import app_config
@@ -45,6 +44,11 @@ app.add_middleware(
 class SensorData(BaseModel):
     # TODO: standardise dt return type. With Z?
     time: datetime.datetime
+    value: float
+
+
+class SiteAverage(BaseModel):
+    site_code: str
     value: float
 
 
@@ -95,8 +99,7 @@ def get_site_average(
     start: str,
     end: str,
     response: Response,
-    enrich: bool = True,
-) -> list[dict]:
+) -> list[SiteAverage]:
     """Returns the list of all sites with the average levels for the periods given"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
@@ -109,14 +112,7 @@ def get_site_average(
         datetime.datetime.fromisoformat(sanitise_timestamp(end)),
     )
 
-    if not enrich:
-        return data
-
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    site_metadata = breathe_london.get_sites()
-    enriched_data = Enricher.enrich(site_metadata, data)
-
-    return enriched_data
+    return data
 
 
 @app.get("/site_info")

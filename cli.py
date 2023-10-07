@@ -6,7 +6,6 @@ import app_config
 from influx_datastore import InfluxDatastore
 from site_synchroniser import SiteSynchroniser
 from breathe_london import BreatheLondon
-from enricher import Enricher
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -118,11 +117,7 @@ def datastore_read_site_average(series, start, end):
 
     data = datastore.read_site_average(series, start_date, end_date)
 
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    site_metadata = breathe_london.get_sites()
-    enriched_data = Enricher.enrich(site_metadata, data)
-
-    for row in enriched_data:
+    for row in data:
         print(str(row))
 
 
