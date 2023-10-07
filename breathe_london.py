@@ -5,6 +5,8 @@ import json
 import logging
 import time
 
+from borough_mapper import BoroughMapper
+
 
 class BreatheLondon:
     def __init__(self, api_key):
@@ -14,6 +16,7 @@ class BreatheLondon:
         self.api_key = api_key
         self.base_url = "https://api.breathelondon.org/api"
         self.site_cache_filename = "/data/site_cache.json"
+        self.borough_mapper = BoroughMapper()
 
     def _get(self, endpoint):
         """Makes a GET request from the endpoint"""
@@ -74,6 +77,12 @@ class BreatheLondon:
 
         logging.info("Loading site list from API")
         site_list = self._get("ListSensors")[0]
+
+        # Add in borough name for each sensor
+        for site in site_list:
+            site["Borough"] = self.borough_mapper.get_borough(
+                site["Latitude"], site["Longitude"]
+            )
 
         self._save_site_cache(site_list)
 
