@@ -39,6 +39,16 @@ def sync_all(resync, pause, start):
 
 
 @cli.command()
+def sites():
+    """Reads site data from Breathe London"""
+    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
+    sites = breathe_london.get_sites()
+
+    for site in sites:
+        print(str(site))
+
+
+@cli.command()
 @click.argument("site_code", required=True)
 @click.argument("series", required=True)
 @click.option("--resync", required=False, default=False, is_flag=True)
