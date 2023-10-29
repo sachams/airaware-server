@@ -1,11 +1,13 @@
 import logging
 import click
 import datetime
+import json
 
 import app_config
 from influx_datastore import InfluxDatastore
 from site_synchroniser import SiteSynchroniser
 from breathe_london import BreatheLondon
+from reproj_geojson import ReprojGeojson
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -119,6 +121,20 @@ def datastore_read_site_average(series, start, end):
 
     for row in data:
         print(str(row))
+
+
+@cli.command()
+@click.argument("src_filename", required=True, type=click.Path(exists=True))
+@click.argument("dest_filename", required=True, type=click.Path())
+@click.argument("src_proj", default="EPSG:27700")
+@click.argument("dest_proj", default="WGS84")
+def reproject_geojson(src_filename, dest_filename, src_proj, dest_proj):
+    """Converts geojson from one coordinate system to another"""
+
+    with open(src_filename, "r") as src_file, open(dest_filename, "w") as dest_file:
+        src_geojson = json.load(src_file)
+        dest_geojson = ReprojGeojson.transform(src_geojson, src_proj, dest_proj)
+        json.dump(dest_geojson, dest_file, indent=2)
 
 
 if __name__ == "__main__":

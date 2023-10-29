@@ -17,6 +17,7 @@ click = "^8.1.7"
 pydantic = "^2.3.0"
 pydash = "^7.0.6"
 shapely = "^2.0.1"
+pyproj = "^3.6.1"
 
 
 [tool.poetry.group.dev.dependencies]
