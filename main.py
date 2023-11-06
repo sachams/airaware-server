@@ -1,25 +1,20 @@
 import datetime
 import logging
-from fastapi import FastAPI, Response, status, Query
+from fastapi import Depends, FastAPI, Response, status, Query
 from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-
-from influx_datastore import InfluxDatastore
+from server.postgres_datastore import PostgresDatastore
 import app_config
+from server.database import SessionLocal, engine
+from sqlalchemy.orm import Session
+from server.schemas import SensorData, SiteAverage
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 logger = logging.getLogger("httpx")
 logger.setLevel(logging.WARNING)
-
-datastore = InfluxDatastore(
-    app_config.influx_host,
-    app_config.influx_token,
-    app_config.influx_org,
-    app_config.influx_database,
-)
 
 app = FastAPI()
 
@@ -41,15 +36,13 @@ app.add_middleware(
 )
 
 
-class SensorData(BaseModel):
-    # TODO: standardise dt return type. With Z?
-    time: datetime.datetime
-    value: float
-
-
-class SiteAverage(BaseModel):
-    site_code: str
-    value: float
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def sanitise_timestamp(dt):
@@ -68,7 +61,8 @@ def get_sensor_data(
     frequency: str,
     response: Response,
     site: Annotated[list[str] | None, Query()] = None,
-) -> list[SensorData]:
+    db: Session = Depends(get_db),
+) -> list[SensorData] | dict:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
@@ -81,6 +75,8 @@ def get_sensor_data(
     if frequency != "hourly" and frequency != "daily":
         response = status.HTTP_400_BAD_REQUEST
         return {"error": f"Invalid frequency {frequency}"}
+
+    datastore = PostgresDatastore(db)
 
     data = datastore.read_data(
         series,
@@ -99,12 +95,15 @@ def get_site_average(
     start: str,
     end: str,
     response: Response,
-) -> list[SiteAverage]:
+    db: Session = Depends(get_db),
+) -> list[SiteAverage] | dict:
     """Returns the list of all sites with the average levels for the periods given"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
         response = status.HTTP_400_BAD_REQUEST
         return {"error": f"Invalid series {series}"}
+
+    datastore = PostgresDatastore(db)
 
     data = datastore.read_site_average(
         series,
