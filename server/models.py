@@ -7,8 +7,7 @@ from .database import Base
 class SensorData(Base):
     __tablename__ = "sensor_data"
 
-    id = Column(Integer, primary_key=True, index=True)
-    site_code = Column(String, index=True)
-    series = Column(String, index=True)
-    time = Column(DateTime(timezone=True))
-    value = Column(Float)
+    site_code = Column(String, index=True, primary_key=True, nullable=False)
+    series = Column(String, index=True, primary_key=True, nullable=False)
+    time = Column(DateTime(timezone=True), primary_key=True, index=True, nullable=False)
+    value = Column(Float, nullable=False)
