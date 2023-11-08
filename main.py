@@ -1,6 +1,9 @@
+import json
+import os
 import datetime
 import logging
-from fastapi import Depends, FastAPI, Response, status, Query
+from fastapi import Depends, FastAPI, Response, status, Query, HTTPException
+from fastapi.responses import JSONResponse
 from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
@@ -68,13 +71,11 @@ def get_sensor_data(
     sites"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
 
     frequency = frequency.lower()
     if frequency != "hourly" and frequency != "daily":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid frequency {frequency}"}
+        raise HTTPException(status_code=400, detail=f"Invalid frequency {frequency}")
 
     datastore = PostgresDatastore(db)
 
@@ -94,14 +95,12 @@ def get_site_average(
     series: str,
     start: str,
     end: str,
-    response: Response,
     db: Session = Depends(get_db),
 ) -> list[SiteAverage] | dict:
     """Returns the list of all sites with the average levels for the periods given"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
 
     datastore = PostgresDatastore(db)
 
@@ -120,6 +119,20 @@ def get_site_info():
     that the site list is cached for 24h"""
     breathe_london = BreatheLondon(app_config.breathe_london_api_key)
     return breathe_london.get_sites()
+
+
+@app.get("/geometry/{name}")
+def get_geometry(name: str) -> str | dict:
+    """Returns the named geometry. The name will have a .json extension added
+    and will be searched for in the geometry folder"""
+    path = f"geometry/{name}.json"
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"Invalid geometry {name}")
+
+    with open(path, "r") as geometry_file:
+        geometry = json.load(geometry_file)
+        return geometry
 
 
 @app.get("/healthcheck")
