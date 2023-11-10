@@ -1,27 +1,35 @@
+import json
+import os
 import datetime
 import logging
-from fastapi import FastAPI, Response, status, Query
+from fastapi import (
+    Depends,
+    FastAPI,
+    Response,
+    status,
+    Query,
+    HTTPException,
+    APIRouter,
+    Request,
+)
+from fastapi.responses import JSONResponse
 from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-
-from influx_datastore import InfluxDatastore
+from server.postgres_datastore import PostgresDatastore
 import app_config
+from server.database import SessionLocal, engine
+from sqlalchemy.orm import Session
+from server.schemas import SensorData, SiteAverage
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
 logger = logging.getLogger("httpx")
 logger.setLevel(logging.WARNING)
 
-datastore = InfluxDatastore(
-    app_config.influx_host,
-    app_config.influx_token,
-    app_config.influx_org,
-    app_config.influx_database,
-)
-
 app = FastAPI()
+api_router = APIRouter()
 
 origins = [
     "https://airaware.static.observableusercontent.com",
@@ -41,15 +49,19 @@ app.add_middleware(
 )
 
 
-class SensorData(BaseModel):
-    # TODO: standardise dt return type. With Z?
-    time: datetime.datetime
-    value: float
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-class SiteAverage(BaseModel):
-    site_code: str
-    value: float
+def log_request_info(request: Request, db: Session = Depends(get_db)):
+    """Logs each request to the database"""
+    datastore = PostgresDatastore(db)
+    datastore.write_request_log(str(request.url), request.client.host)
 
 
 def sanitise_timestamp(dt):
@@ -60,7 +72,7 @@ def sanitise_timestamp(dt):
     return dt.split(".")[0]
 
 
-@app.get("/sensor/{series}/{start}/{end}/{frequency}")
+@api_router.get("/sensor/{series}/{start}/{end}/{frequency}")
 def get_sensor_data(
     series: str,
     start: str,
@@ -68,19 +80,20 @@ def get_sensor_data(
     frequency: str,
     response: Response,
     site: Annotated[list[str] | None, Query()] = None,
-) -> list[SensorData]:
+    db: Session = Depends(get_db),
+) -> list[SensorData] | dict:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
 
     frequency = frequency.lower()
     if frequency != "hourly" and frequency != "daily":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid frequency {frequency}"}
+        raise HTTPException(status_code=400, detail=f"Invalid frequency {frequency}")
+
+    datastore = PostgresDatastore(db)
 
     data = datastore.read_data(
         series,
@@ -93,18 +106,19 @@ def get_sensor_data(
     return data
 
 
-@app.get("/site_average/{series}/{start}/{end}")
+@api_router.get("/site_average/{series}/{start}/{end}")
 def get_site_average(
     series: str,
     start: str,
     end: str,
-    response: Response,
-) -> list[SiteAverage]:
+    db: Session = Depends(get_db),
+) -> list[SiteAverage] | dict:
     """Returns the list of all sites with the average levels for the periods given"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
+
+    datastore = PostgresDatastore(db)
 
     data = datastore.read_site_average(
         series,
@@ -115,7 +129,7 @@ def get_site_average(
     return data
 
 
-@app.get("/site_info")
+@api_router.get("/site_info")
 def get_site_info():
     """Returns the list of all sites from the Breathe London API. Note
     that the site list is cached for 24h"""
@@ -123,7 +137,24 @@ def get_site_info():
     return breathe_london.get_sites()
 
 
-@app.get("/healthcheck")
+@api_router.get("/geometry/{name}")
+def get_geometry(name: str) -> str | dict:
+    """Returns the named geometry. The name will have a .json extension added
+    and will be searched for in the geometry folder"""
+    path = f"geometry/{name}.json"
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"Invalid geometry {name}")
+
+    with open(path, "r") as geometry_file:
+        geometry = json.load(geometry_file)
+        return geometry
+
+
+@api_router.get("/healthcheck")
 def healthcheck():
     """Healthcheck endpoint when running under fly.dev"""
     return {"status": "ok"}
+
+
+app.include_router(api_router, dependencies=[Depends(log_request_info)])

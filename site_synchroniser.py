@@ -2,6 +2,8 @@ import datetime
 import logging
 import time
 
+from server.schemas import SensorDataCreate
+
 
 class SiteSynchroniser:
     def __init__(self, datastore, breathe_london):
@@ -66,8 +68,24 @@ class SiteSynchroniser:
         logging.info(f"[{site_code}:{series}] Found {len(data)} rows")
 
         if data:
+            data_schema = []
+            for item in data:
+                if item["ScaledValue"] is None:
+                    logging.warning(
+                        f"[{site_code}:{series}] Found null data for timestamp {item['DateTime']} - skipping"
+                    )
+                    continue
+
+                obj = SensorDataCreate(
+                    time=datetime.datetime.strptime(
+                        item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"
+                    ),
+                    value=item["ScaledValue"],
+                )
+                data_schema.append(obj)
+
             logging.info(f"[{site_code}:{series}] Writing data to datastore")
-            self.datastore.write_data(series, data)
+            self.datastore.write_data(site_code, series, data_schema)
             logging.info(f"[{site_code}:{series}] Data written to datastore")
 
         logging.info(f"[{site_code}:{series}] Sync complete")

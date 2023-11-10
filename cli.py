@@ -4,10 +4,11 @@ import datetime
 import json
 
 import app_config
-from influx_datastore import InfluxDatastore
+from server.postgres_datastore import PostgresDatastore
 from site_synchroniser import SiteSynchroniser
 from breathe_london import BreatheLondon
 from reproj_geojson import ReprojGeojson
+from server.database import SessionLocal
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -26,12 +27,7 @@ def cli():
 @click.option("--start", required=False)
 def sync_all(resync, pause, start):
     """Synchronises data between Breathe London and our datastore"""
-    datastore = InfluxDatastore(
-        app_config.influx_host,
-        app_config.influx_token,
-        app_config.influx_org,
-        app_config.influx_database,
-    )
+    datastore = PostgresDatastore(SessionLocal())
 
     breathe_london = BreatheLondon(app_config.breathe_london_api_key)
     synchroniser = SiteSynchroniser(datastore, breathe_london)
@@ -55,16 +51,24 @@ def sites():
 @click.option("--resync", required=False, default=False, is_flag=True)
 def sync(site_code, series, resync):
     """Synchronises data between Breathe London and our datastore"""
-    datastore = InfluxDatastore(
-        app_config.influx_host,
-        app_config.influx_token,
-        app_config.influx_org,
-        app_config.influx_database,
-    )
+    datastore = PostgresDatastore(SessionLocal())
 
     breathe_london = BreatheLondon(app_config.breathe_london_api_key)
     synchroniser = SiteSynchroniser(datastore, breathe_london)
     synchroniser.sync(site_code, series, resync)
+
+
+@cli.command()
+@click.argument("site_code", required=True)
+@click.argument("series", required=True)
+def last_time(site_code, series):
+    """Returns the last date/time for the site and series"""
+    import pdb
+
+    pdb.set_trace()
+
+    datastore = PostgresDatastore(SessionLocal())
+    print(datastore.get_latest_date(site_code, series))
 
 
 @cli.command()
@@ -83,12 +87,7 @@ def datastore_read(series, start, end, site_code, frequency):
     """Reads data from the datastore, averaging across all nodes, or optionally just
     the specified node(s)"""
 
-    datastore = InfluxDatastore(
-        app_config.influx_host,
-        app_config.influx_token,
-        app_config.influx_org,
-        app_config.influx_database,
-    )
+    datastore = PostgresDatastore(SessionLocal())
 
     start_date = datetime.datetime.fromisoformat(start)
     end_date = datetime.datetime.fromisoformat(end)
@@ -107,12 +106,7 @@ def datastore_read_site_average(series, start, end):
     """Reads data from the datastore, averaging across all nodes, or optionally just
     the specified node(s)"""
 
-    datastore = InfluxDatastore(
-        app_config.influx_host,
-        app_config.influx_token,
-        app_config.influx_org,
-        app_config.influx_database,
-    )
+    datastore = PostgresDatastore(SessionLocal())
 
     start_date = datetime.datetime.fromisoformat(start)
     end_date = datetime.datetime.fromisoformat(end)

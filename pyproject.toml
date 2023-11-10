@@ -18,6 +18,9 @@ pydantic = "^2.3.0"
 pydash = "^7.0.6"
 shapely = "^2.0.1"
 pyproj = "^3.6.1"
+sqlalchemy = "^2.0.22"
+psycopg2-binary = "^2.9.9"
+alembic = "^1.12.1"
 
 
 [tool.poetry.group.dev.dependencies]

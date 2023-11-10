@@ -11,7 +11,7 @@ class BoroughMapper:
     borough geojson file"""
 
     def __init__(self):
-        with open("london_boroughs.json") as f:
+        with open("geometry/boroughs.json") as f:
             boundaries = json.load(f)
 
         self.polygons = {}
