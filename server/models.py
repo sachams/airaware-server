@@ -11,3 +11,11 @@ class SensorData(Base):
     series = Column(String, index=True, primary_key=True, nullable=False)
     time = Column(DateTime(timezone=True), primary_key=True, index=True, nullable=False)
     value = Column(Float, nullable=False)
+
+
+class RequestLog(Base):
+    __tablename__ = "request_log"
+    id = Column(Integer, primary_key=True, nullable=False)
+    time = Column(DateTime(timezone=True), index=True, nullable=False)
+    ip_address = Column(String, nullable=False)
+    path = Column(String, nullable=False)

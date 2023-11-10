@@ -12,6 +12,14 @@ class PostgresDatastore:
     def __init__(self, db: Session):
         self.db = db
 
+    def write_request_log(self, url: str, ip_address: str):
+        """Records requests"""
+        db_item = models.RequestLog(
+            path=url, ip_address=ip_address, time=datetime.datetime.utcnow()
+        )
+        self.db.add(db_item)
+        self.db.commit()
+
     def write_data(self, site_code, series, data: list[schemas.SensorDataCreate]):
         """Writes Breathe London series data to the database"""
         objects = []

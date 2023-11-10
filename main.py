@@ -1,6 +1,18 @@
+import json
+import os
 import datetime
 import logging
-from fastapi import Depends, FastAPI, Response, status, Query
+from fastapi import (
+    Depends,
+    FastAPI,
+    Response,
+    status,
+    Query,
+    HTTPException,
+    APIRouter,
+    Request,
+)
+from fastapi.responses import JSONResponse
 from typing import Annotated, Tuple
 from breathe_london import BreatheLondon
 from pydantic import BaseModel
@@ -17,6 +29,7 @@ logger = logging.getLogger("httpx")
 logger.setLevel(logging.WARNING)
 
 app = FastAPI()
+api_router = APIRouter()
 
 origins = [
     "https://airaware.static.observableusercontent.com",
@@ -45,6 +58,12 @@ def get_db():
         db.close()
 
 
+def log_request_info(request: Request, db: Session = Depends(get_db)):
+    """Logs each request to the database"""
+    datastore = PostgresDatastore(db)
+    datastore.write_request_log(str(request.url), request.client.host)
+
+
 def sanitise_timestamp(dt):
     """Sanitises datetime inputs"""
 
@@ -53,7 +72,7 @@ def sanitise_timestamp(dt):
     return dt.split(".")[0]
 
 
-@app.get("/sensor/{series}/{start}/{end}/{frequency}")
+@api_router.get("/sensor/{series}/{start}/{end}/{frequency}")
 def get_sensor_data(
     series: str,
     start: str,
@@ -68,13 +87,11 @@ def get_sensor_data(
     sites"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
 
     frequency = frequency.lower()
     if frequency != "hourly" and frequency != "daily":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid frequency {frequency}"}
+        raise HTTPException(status_code=400, detail=f"Invalid frequency {frequency}")
 
     datastore = PostgresDatastore(db)
 
@@ -89,19 +106,17 @@ def get_sensor_data(
     return data
 
 
-@app.get("/site_average/{series}/{start}/{end}")
+@api_router.get("/site_average/{series}/{start}/{end}")
 def get_site_average(
     series: str,
     start: str,
     end: str,
-    response: Response,
     db: Session = Depends(get_db),
 ) -> list[SiteAverage] | dict:
     """Returns the list of all sites with the average levels for the periods given"""
     series = series.upper()
     if series != "NO2" and series != "PM25":
-        response = status.HTTP_400_BAD_REQUEST
-        return {"error": f"Invalid series {series}"}
+        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
 
     datastore = PostgresDatastore(db)
 
@@ -114,7 +129,7 @@ def get_site_average(
     return data
 
 
-@app.get("/site_info")
+@api_router.get("/site_info")
 def get_site_info():
     """Returns the list of all sites from the Breathe London API. Note
     that the site list is cached for 24h"""
@@ -122,7 +137,24 @@ def get_site_info():
     return breathe_london.get_sites()
 
 
-@app.get("/healthcheck")
+@api_router.get("/geometry/{name}")
+def get_geometry(name: str) -> str | dict:
+    """Returns the named geometry. The name will have a .json extension added
+    and will be searched for in the geometry folder"""
+    path = f"geometry/{name}.json"
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"Invalid geometry {name}")
+
+    with open(path, "r") as geometry_file:
+        geometry = json.load(geometry_file)
+        return geometry
+
+
+@api_router.get("/healthcheck")
 def healthcheck():
     """Healthcheck endpoint when running under fly.dev"""
     return {"status": "ok"}
+
+
+app.include_router(api_router, dependencies=[Depends(log_request_info)])
