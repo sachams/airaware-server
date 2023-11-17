@@ -48,7 +48,7 @@ class SensorRepository(AbstractSensorRepository):
         # If we have been supplied a list of site codes, join with the Site table
         # and filter by site code
         if codes:
-            query = query.join(SiteModel).filter(SiteModel.code.in_(codes))
+            query = query.join(SiteModel).filter(SiteModel.site_code.in_(codes))
 
         query = query.group_by(
             func.date_trunc(frequency.value, SensorDataModel.time).label("time")
@@ -98,11 +98,12 @@ class SensorRepository(AbstractSensorRepository):
         if source is not None:
             query = query.filter(SiteModel.source == source)
 
-        query = query.order_by(desc(SiteModel.code))
+        query = query.order_by(desc(SiteModel.site_code))
         SiteList = TypeAdapter(List[SiteSchema])
         return SiteList.validate_python(self.db.execute(query))
 
-    def update_sites(self, list[SiteSchema]) -> None:
-        """Updates sites on the repository (matched by site_code) or adds new ones if they don't exist"""
+    def update_sites(self, sites: list[SiteSchema]) -> None:
+        """Updates sites on the repository (matched by site_code)
+        or adds new ones if they don't exist"""
         # TODO: add code
         pass

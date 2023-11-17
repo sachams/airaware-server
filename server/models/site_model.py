@@ -14,7 +14,7 @@ class SiteModel(Base):
 
     # Mandatory fields
     site_id: Mapped[int] = mapped_column(primary_key=True)
-    code: Mapped[str] = mapped_column(unique=True)
+    site_code: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
     status: Mapped[SiteStatus]
     latitude: Mapped[float]

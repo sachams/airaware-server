@@ -7,7 +7,7 @@ from server.types import Classification, SiteStatus, Source
 
 class SiteBaseSchema(BaseModel):
     # Mandatory fields
-    code: str
+    site_code: str
     name: str
     status: SiteStatus
     latitude: float

@@ -5,71 +5,13 @@ import time
 import httpx
 from borough_mapper import BoroughMapper
 
-from server.schemas import SensorDataSchema, SiteSchema
+from server.schemas import SensorDataRemoteSchema, SiteCreateSchema
 from server.types import Classification, Series, SiteStatus, Source
-
-"""BreatheLondon Site data looks like this:
-    {
-        "SiteCode": "CLDP0001",
-        "SiteName": "Royal London University Hospital",
-        "Latitude": 51.518775939941406,
-        "Longitude": -0.059463899582624435,
-        "LocalAuthorityID": null,
-        "SiteClassification": "Urban Background",
-        "HeadHeight": 2.4000000953674316,
-        "ToRoad": 30,
-        "SiteLocationType": "Hospital",
-        "Indoor": 0,
-        "SitePhotoURL": "https://api.breathelondon.org/assets/images/CLDP0001.jpg",
-        "SiteDescription": "The Royal London Hospital is home to one of the largest...",
-        "SleepTime": 1200,
-        "BatteryStatus": "discharging normally",
-        "BatteryPercentage": 91,
-        "SignalStrength": "4-excellent",
-        "SensorsHealthStatus": "OK",
-        "OverallStatus": "Healthy",
-        "DeviceCode": "A7Y9WHYD",
-        "StartDate": "2021-01-22T08:59:25.167Z",
-        "EndDate": null,
-        "LastCommunication": "2023-11-10T04:17:32.543Z",
-        "InputPowerError": 0,
-        "InputPowerCurrent": 0,
-        "InputPowerVoltage": 0,
-        "InputBatteryError": 0,
-        "InputBatteryVoltage": 3.8635923862457275,
-        "ChargingStatus": 7,
-        "SignalQuality": 31,
-        "BatterySleepMultiplier": 4,
-        "WeatherError": 0,
-        "PMError": 0,
-        "NO2Error": 0,
-        "LatestINO2Value": null,
-        "LatestINO2Index": null,
-        "LatestINO2IndexSource": null,
-        "LatestIPM10Value": null,
-        "LatestIPM10NUMValue": null,
-        "LatestIPM1Value": null,
-        "LatestIPM1NUMValue": null,
-        "LatestIPM25Value": null,
-        "LatestIPM25Index": null,
-        "LatestIPM25IndexSource": null,
-        "LatestIPM25NUMValue": null,
-        "LatestRELHUMValue": null,
-        "LatestTEMPERATValue": null,
-        "SiteActive": 1,
-        "SiteGroup": "GLA",
-        "PowerTag": "Solar",
-        "Enabled": "Y",
-        "OtherTags": "Deployed, GLA, Solar300, Tower Hamlets, V1",
-        "OrganisationName": "Mayor of London",
-        "SponsorName": "Mayor of London",
-        "HourlyBulletinEnd": "Nov 10 2023  6:00AM",
-        "Borough": "Tower Hamlets"
-    },
-"""
 
 
 class BreatheLondon:
+    """This class loads site and sensor data from the Breathe London API"""
+
     def __init__(self, api_key):
         # Check if a directory called /data exists. If so, use it as the file root
         self.max_retries = 3
@@ -81,7 +23,7 @@ class BreatheLondon:
 
     @property
     def name(self):
-        return "Breathe London"
+        return Source.breathe_london
 
     def _get(self, endpoint):
         """Makes a GET request from the endpoint"""
@@ -147,7 +89,7 @@ class BreatheLondon:
             case _:
                 return Classification.unknown
 
-    def get_sites(self) -> list[SiteSchema]:
+    def get_sites(self) -> list[SiteCreateSchema]:
         """Requests a list of sites from Breathe London and returns list of sites"""
 
         logging.info("Loading site list from API")
@@ -155,13 +97,13 @@ class BreatheLondon:
 
         all_sites = []
         for site in site_list:
-            obj = SiteSchema(
-                code=site["SiteCode"],
+            obj = SiteCreateSchema(
+                site_code=site["SiteCode"],
                 name=site["SiteName"],
                 status=self._get_status_enum(site["OverallStatus"]),
                 latitude=site["Latitude"],
                 longitude=site["Longitude"],
-                classification=self._get_classification_enum(site["SiteClassification"]),
+                site_type=self._get_classification_enum(site["SiteClassification"]),
                 source=Source.breathe_london,
                 photo_url=site["SitePhotoURL"],
                 description=site["SiteDescription"],
@@ -185,8 +127,7 @@ class BreatheLondon:
         if timestamp is None:
             return None
 
-        # TODO: handle .000Z
-        return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
+        return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
 
     def get_sensor_data(
         self,
@@ -194,7 +135,7 @@ class BreatheLondon:
         start: datetime.datetime,
         end: datetime.datetime,
         series: Series,
-    ) -> list[SensorDataSchema]:
+    ) -> list[SensorDataRemoteSchema]:
         data = self._get(
             f"getClarityData/{site_code}/"
             f"I{series.name.upper()}/"
@@ -203,7 +144,7 @@ class BreatheLondon:
             "Hourly"
         )
 
-        if type(data) == dict:
+        if type(data) is dict:
             # Looks like we get the following returned if there's no data:
             # {
             #     "recordsets": [],
@@ -222,11 +163,12 @@ class BreatheLondon:
         for item in data:
             if item["ScaledValue"] is None:
                 logging.warning(
-                    f"[{site_code}:{series}] Found null data for timestamp {item['DateTime']} - skipping"
+                    f"[{site_code}:{series}] Found null data for timestamp {item['DateTime']}"
+                    "- skipping"
                 )
                 continue
 
-            obj = SensorDataSchema(
+            obj = SensorDataRemoteSchema(
                 time=datetime.datetime.strptime(item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"),
                 value=item["ScaledValue"],
             )

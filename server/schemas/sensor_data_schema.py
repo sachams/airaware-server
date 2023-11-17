@@ -10,10 +10,15 @@ class SensorDataBaseSchema(BaseModel):
     value: float
 
 
+class SensorDataRemoteSchema(SensorDataBaseSchema):
+    """This schema is returned from remote data sources"""
+
+    pass
+
+
 class SensorDataCreateSchema(SensorDataBaseSchema):
     site_id: int
     series: Series
-    pass
 
 
 class SensorDataSchema(SensorDataBaseSchema):

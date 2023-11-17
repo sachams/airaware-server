@@ -23,3 +23,37 @@
     }),
   ])
 # ---
+# name: test_get_sites
+  list([
+    dict({
+      'borough': 'Lambeth',
+      'description': 'The Royal London Hospital is home to one of the largest...',
+      'end_date': '2022-06-05T03:02:01',
+      'latitude': 51.518775939941406,
+      'longitude': -0.059463899582624435,
+      'name': 'Royal London University Hospital',
+      'photo_url': 'https://api.breathelondon.org/assets/images/CLDP0001.jpg',
+      'site_code': 'CLDP0001',
+      'site_id': 1,
+      'site_type': 'urban_background',
+      'source': 'breathe_london',
+      'start_date': '2020-06-05T03:02:01',
+      'status': 'healthy',
+    }),
+    dict({
+      'borough': 'Lambeth',
+      'description': 'Brixton Central',
+      'end_date': None,
+      'latitude': 50.0,
+      'longitude': -0.01,
+      'name': 'Brixton',
+      'photo_url': 'https://api.breathelondon.org/assets/images/CLDP0002.jpg',
+      'site_code': 'CLDP0002',
+      'site_id': 2,
+      'site_type': 'roadside',
+      'source': 'breathe_london',
+      'start_date': '2022-06-05T03:02:01',
+      'status': 'coming_online',
+    }),
+  ])
+# ---

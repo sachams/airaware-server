@@ -1,13 +1,12 @@
-import datetime
-
 import app_config
 
-from server.schemas import SensorDataSchema, SiteSchema
 from server.source.breathe_london import BreatheLondon
-from server.types import Series, Source
+from server.types import Source
 
 
 class RemoteSources:
+    """Manages a set of remote sources, keyed by Source"""
+
     def __init__(self):
         self.sources = {Source.breathe_london: BreatheLondon(app_config.breathe_london_api_key)}
 

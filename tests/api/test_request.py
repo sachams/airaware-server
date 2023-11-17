@@ -3,7 +3,7 @@ from http import HTTPStatus
 import pytest
 
 
-@pytest.mark.usefixtures("fake_uow")
+@pytest.mark.usefixtures("use_fake_uow")
 def test_request_logged(client, request_repository, mocker):
     """Asserts that the request logger works"""
 

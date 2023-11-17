@@ -6,8 +6,11 @@ from server.types import Classification, Frequency, Series, SiteStatus, Source
 
 
 class FakeSensorRepository(AbstractSensorRepository):
+    def __init__(self):
+        self.data = []
+
     def write_data(self, data: list[SensorDataCreateSchema]) -> None:
-        pass
+        self.data = data
 
     def get_data(
         self,
@@ -31,13 +34,13 @@ class FakeSensorRepository(AbstractSensorRepository):
         ]
 
     def get_latest_date(self, site_code, series) -> datetime.datetime:
-        pass
+        return datetime.datetime(2020, 6, 5, 3, 2, 1)
 
     def get_sites(self, source: Source | None) -> list[SiteSchema]:
         return [
             SiteSchema(
                 site_id=1,
-                code="CLDP0001",
+                site_code="CLDP0001",
                 name="Royal London University Hospital",
                 status=SiteStatus.healthy,
                 latitude=51.518775939941406,
@@ -52,7 +55,7 @@ class FakeSensorRepository(AbstractSensorRepository):
             ),
             SiteSchema(
                 site_id=2,
-                code="CLDP0002",
+                site_code="CLDP0002",
                 name="Brixton",
                 status=SiteStatus.coming_online,
                 latitude=50.0,

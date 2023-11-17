@@ -2,7 +2,7 @@ import datetime
 import logging
 import time
 
-from server.schemas import SensorDataSchema, SiteAverageSchema, SiteSchema
+from server.schemas import SensorDataCreateSchema, SensorDataSchema, SiteAverageSchema, SiteSchema
 from server.service.processing_result import ProcessingResult
 from server.source.remote_sources import RemoteSources
 from server.types import Frequency, Series, Source
@@ -53,27 +53,32 @@ def sync_sites(uow: AbstractUnitOfWork) -> None:
 
 
 def sync_single_site_data(
-    uow: AbstractUnitOfWork, code: str, source: Source, series: Series, resync: bool
+    uow: AbstractUnitOfWork,
+    site_code: str,
+    site_id: int,
+    source: Source,
+    series: Series,
+    resync: bool,
 ):
     with uow:
-        """SYnchronises data from a source to the datastore by:
+        """Synchronises data from a source to the datastore by:
         1. looking for the latest data in the datastore
         2. Reading data from the source after this date
         3. Writing this data to the datastore
         """
-        logging.info(f"[{code}:{series}] {'Resync' if resync else 'Sync'} Sync started")
+        logging.info(f"[{site_code}:{series}] {'Resync' if resync else 'Sync'} Sync started")
 
         # Get the source of data based on the source enum
         remote_source = RemoteSources().get_source(source)
 
         # Work out when the last data in our database is
-        latest_date = None if resync else uow.sensors.get_latest_date(code, series)
+        latest_date = None if resync else uow.sensors.get_latest_date(site_code, series)
 
         if latest_date is not None:
-            logging.info(f"[{code}:{series}] Latest repository date is {latest_date}")
+            logging.info(f"[{site_code}:{series}] Latest repository date is {latest_date}")
         else:
             logging.info(
-                f"[{code}:{series}] No data present in repository or full resync triggered - "
+                f"[{site_code}:{series}] No data present in repository or full resync triggered - "
                 "loading from 1 Jan 2000"
             )
             latest_date = datetime.datetime(2000, 1, 1)
@@ -82,21 +87,26 @@ def sync_single_site_data(
         start = latest_date + datetime.timedelta(hours=1)
         end = datetime.datetime.utcnow()
 
-        logging.info(f"[{code}:{series}] Loading data from {source} between {start} and {end}")
+        logging.info(f"[{site_code}:{series}] Loading data from {source} between {start} and {end}")
 
         start_time = time.time()
-        data = remote_source.get_sensor_data(code, start, end, series)
+        data = remote_source.get_sensor_data(site_code, start, end, series)
         elapsed = time.time() - start_time
 
-        logging.info(f"[{code}:{series}] Found {len(data)} rows in {elapsed:.3f}s")
+        logging.info(f"[{site_code}:{series}] Found {len(data)} rows in {elapsed:.3f}s")
 
+        # We need to add in the site code and series on each record
+        enriched = [
+            SensorDataCreateSchema(**item.model_dump(), site_id=site_id, series=series)
+            for item in data
+        ]
         start_time = time.time()
-        uow.sensors.write_data(data)
+        uow.sensors.write_data(enriched)
         elapsed = time.time() - start_time
 
-        logging.info(f"[{code}:{series}] Data written to repository in {elapsed:.3f}s")
+        logging.info(f"[{site_code}:{series}] Data written to repository in {elapsed:.3f}s")
 
-        logging.info(f"[{code}:{series}] Sync complete")
+        logging.info(f"[{site_code}:{series}] Sync complete")
 
 
 def sync_all(uow: AbstractUnitOfWork, resync: bool, start_code: str):
@@ -107,13 +117,13 @@ def sync_all(uow: AbstractUnitOfWork, resync: bool, start_code: str):
     for site in sites:
         # Skip over sites before `start_code` - makes it easy to resume a failed
         # sync when testing
-        if start_code is not None and site.code < start_code:
-            logging.info(f"Skipping site {site.code}")
+        if start_code is not None and site.site_code < start_code:
+            logging.info(f"Skipping site {site.site_code}")
             continue
 
-        logging.info(f"*** Starting {site.code} sync ***")
+        logging.info(f"*** Starting {site.site_code} sync ***")
 
         for series in Series:
-            sync_single_site_data(uow, site.code, site.source, series, resync)
+            sync_single_site_data(uow, site.site_code, site.site_id, site.source, series, resync)
 
-        logging.info(f"*** {site.code} sync complete ***")
+        logging.info(f"*** {site.site_code} sync complete ***")
