@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import List
 
 from pydantic import TypeAdapter
@@ -21,8 +22,7 @@ class SensorRepository(AbstractSensorRepository):
         for item in data:
             db_item = SensorDataModel(**item.model_dump())
             objects.append(db_item)
-        self.db.bulk_save_objects(objects)
-        self.db.commit()
+        self.session.bulk_save_objects(objects)
 
     def get_data(
         self,
@@ -55,7 +55,7 @@ class SensorRepository(AbstractSensorRepository):
         ).order_by(func.date_trunc(frequency.value, SensorDataModel.time))
 
         SensorDataList = TypeAdapter(List[SensorDataSchema])
-        return SensorDataList.validate_python(self.db.execute(query))
+        return SensorDataList.validate_python(self.session.execute(query))
 
     def get_site_average(
         self, series: Series, start: datetime.datetime, end: datetime.datetime
@@ -64,7 +64,7 @@ class SensorRepository(AbstractSensorRepository):
         across the specified time period. Data is returned as list of site_code
         and average value.
         """
-        return self.db.execute(
+        return self.session.execute(
             select(
                 SensorDataModel.site_code,
                 func.avg(SensorDataModel.value).label("value"),
@@ -78,7 +78,7 @@ class SensorRepository(AbstractSensorRepository):
 
     def get_latest_date(self, site_code, series) -> datetime.datetime:
         reading = (
-            self.db.execute(
+            self.session.execute(
                 select(SensorDataModel)
                 .filter(SensorDataModel.site_code == site_code)
                 .filter(SensorDataModel.series == series)
@@ -100,10 +100,26 @@ class SensorRepository(AbstractSensorRepository):
 
         query = query.order_by(desc(SiteModel.site_code))
         SiteList = TypeAdapter(List[SiteSchema])
-        return SiteList.validate_python(self.db.execute(query))
+        return SiteList.validate_python(self.session.execute(query))
 
     def update_sites(self, sites: list[SiteSchema]) -> None:
         """Updates sites on the repository (matched by site_code)
         or adds new ones if they don't exist"""
-        # TODO: add code
-        pass
+
+        logging.info("Saving site list to database")
+        for site in sites:
+            existing_site = (
+                self.session.execute(
+                    select(SiteModel).filter(SiteModel.site_code == site.site_code)
+                )
+                .scalars()
+                .one_or_none()
+            )
+
+            new_obj = SiteModel(**site.model_dump())
+
+            if existing_site is None:
+                self.session.add(new_obj)
+            else:
+                new_obj.site_id = existing_site.site_id
+                self.session.merge(new_obj)

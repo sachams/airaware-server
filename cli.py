@@ -1,14 +1,14 @@
-import logging
-import click
 import datetime
 import json
+import logging
 
 import app_config
-from server.postgres_datastore import PostgresDatastore
-from site_synchroniser import SiteSynchroniser
-from breathe_london import BreatheLondon
+import click
 from reproj_geojson import ReprojGeojson
+
 from server.database import SessionLocal
+from server.service.sensor_service import sync_sites as sensor_sync_sites
+from server.unit_of_work.unit_of_work import UnitOfWork
 
 # Configure logging
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -36,13 +36,10 @@ def sync_all(resync, pause, start):
 
 
 @cli.command()
-def sites():
-    """Reads site data from Breathe London"""
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    sites = breathe_london.get_sites()
-
-    for site in sites:
-        print(str(site))
+def sync_sites():
+    """Syncs site data from remote sources to the database"""
+    uow = UnitOfWork()
+    sensor_sync_sites(uow)
 
 
 @cli.command()

@@ -10,7 +10,9 @@ from server.types import Series
 class SensorDataModel(Base):
     __tablename__ = "sensor_data"
 
-    site_id: Mapped[int] = mapped_column(ForeignKey("site.site_id"), primary_key=True)
-    series: Mapped[Series] = mapped_column(primary_key=True)
-    time: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("site.site_id"), primary_key=True, index=True)
+    series: Mapped[Series] = mapped_column(primary_key=True, index=True)
+    time: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True, index=True
+    )
     value: Mapped[float]

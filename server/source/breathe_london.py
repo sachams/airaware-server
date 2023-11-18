@@ -49,6 +49,9 @@ class BreatheLondon:
     def _get_status_enum(self, status):
         # Remove any spaces and convert to lower case before matching.
         # This cleans up some variations
+        if status is None:
+            return SiteStatus.unknown
+
         match status.lower().replace(" ", ""):
             case "healthy":
                 return SiteStatus.healthy
@@ -67,6 +70,9 @@ class BreatheLondon:
 
     def _get_classification_enum(self, classification):
         # Convert to lower case before matching.
+        if classification is None:
+            return Classification.unknown
+
         match classification.lower():
             case "urban background":
                 return Classification.urban_background

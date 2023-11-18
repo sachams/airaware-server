@@ -48,6 +48,7 @@ def sync_sites(uow: AbstractUnitOfWork) -> None:
         with uow:
             sites = remote_source.get_sites()
             uow.sensors.update_sites(sites)
+            uow.commit()
 
         return ProcessingResult.SUCCESS_RETRIEVED, None
 
@@ -102,6 +103,7 @@ def sync_single_site_data(
         ]
         start_time = time.time()
         uow.sensors.write_data(enriched)
+        uow.commit()
         elapsed = time.time() - start_time
 
         logging.info(f"[{site_code}:{series}] Data written to repository in {elapsed:.3f}s")

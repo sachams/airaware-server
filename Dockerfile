@@ -28,6 +28,13 @@ COPY requirements.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+####### dev stuff
+
+# Copy pdb config file to home directory to set default PDBPP behaviour
+COPY ./.pdbrc.py /root
+COPY dev_requirements.txt ./
+RUN pip install --no-cache-dir -r dev_requirements.txt
+
 COPY . ./
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

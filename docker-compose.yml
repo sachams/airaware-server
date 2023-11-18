@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  database:
+    image: timescale/timescaledb:latest-pg14
+    container_name: database
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "postgres"
+    user: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    container_name: server
+    ports:
+      # Bind each service to a different port so that they can all be running at the same time
+      - "8081:80"
+    build:
+      context: ${PWD}
+    environment:
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: breathe_air
+      DATABASE_HOST: database
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      # These volumes are mounted at run time
+      - ${PWD}:/app
+      - .bash_history:/root/.bash_history
