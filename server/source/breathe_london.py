@@ -150,7 +150,7 @@ class BreatheLondon:
             "Hourly"
         )
 
-        if type(data) is dict:
+        if isinstance(data, dict):
             # Looks like we get the following returned if there's no data:
             # {
             #     "recordsets": [],

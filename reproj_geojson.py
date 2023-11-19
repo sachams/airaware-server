@@ -9,9 +9,7 @@ from shapely.geometry import shape
 class ReprojGeojson:
     @staticmethod
     def transform(src_geojson, src, dest):
-        project = pyproj.Transformer.from_proj(
-            pyproj.Proj(src), pyproj.Proj(dest), always_xy=True
-        )
+        project = pyproj.Transformer.from_proj(pyproj.Proj(src), pyproj.Proj(dest), always_xy=True)
 
         # Iterate over input features and transform
         dest_geojson = src_geojson.copy()
@@ -31,8 +29,6 @@ class ReprojGeojson:
             feature["geometry"] = shapely.geometry.mapping(dest_shape)
 
             # Also save the centroid of the area
-            feature["properties"]["centre"] = shapely.geometry.mapping(
-                dest_shape.centroid
-            )
+            feature["properties"]["centre"] = shapely.geometry.mapping(dest_shape.centroid)
 
         return dest_geojson

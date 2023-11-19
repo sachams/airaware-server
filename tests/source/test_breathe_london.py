@@ -1,6 +1,5 @@
 import datetime
 
-import app_config
 import pytest
 
 from server.schemas import SensorDataRemoteSchema, SiteCreateSchema
@@ -21,7 +20,7 @@ def test_get_sites(httpx_mock, site_response):
     sites = breathe_london.get_sites()
 
     assert len(sites) == 1
-    assert type(sites[0]) is SiteCreateSchema
+    assert isinstance(sites[0], SiteCreateSchema)
 
     assert sites[0].site_code == "CLDP0001"
     assert sites[0].name == "Royal London University Hospital"
@@ -51,7 +50,7 @@ def test_get_data(httpx_mock, sensor_data_response):
     )
 
     assert len(data) == 2
-    assert type(data[0]) is SensorDataRemoteSchema
+    assert isinstance(data[0], SensorDataRemoteSchema)
 
     assert data[0].time == datetime.datetime(2022, 1, 1, 0, 0)
     assert data[0].value == pytest.approx(28.38500068664551)
@@ -72,4 +71,4 @@ def test_get_data_no_data(httpx_mock):
     )
 
     assert len(data) == 0
-    assert type(data) is list
+    assert isinstance(data, list)

@@ -1,8 +1,7 @@
 import datetime
 
-from server.models import SensorDataModel, SiteModel
 from server.repository.sensor_repository import SensorRepository
-from server.types import Classification, Series, SiteStatus, Source
+from server.types import Series
 
 
 def test_get_site_average(session):
