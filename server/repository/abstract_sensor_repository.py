@@ -22,15 +22,23 @@ class AbstractSensorRepository(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractclassmethod
+    def delete_data(self, series: Series, site_id: int) -> None:
+        raise NotImplementedError
+
+    @abc.abstractclassmethod
     def get_site_average(
         self, series: Series, start: datetime.datetime, end: datetime.datetime
     ) -> list[SiteAverageSchema]:
         raise NotImplementedError
 
     @abc.abstractclassmethod
-    def get_latest_date(self, site_code, series) -> datetime.datetime:
+    def get_latest_date(self, site_id: int, series: Series) -> datetime.datetime:
         raise NotImplementedError
 
     @abc.abstractclassmethod
     def get_sites(self, source: Source | None) -> list[SiteSchema]:
+        raise NotImplementedError
+
+    @abc.abstractclassmethod
+    def get_site(self, site_code: str) -> SiteSchema:
         raise NotImplementedError

@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from pydantic import TypeAdapter
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
 from server.models import SensorDataModel, SiteModel
@@ -57,6 +57,14 @@ class SensorRepository(AbstractSensorRepository):
         SensorDataList = TypeAdapter(List[SensorDataSchema])
         return SensorDataList.validate_python(self.session.execute(query))
 
+    def delete_data(self, series: Series, site_id: int) -> None:
+        """Deletes data from the sensor repository for the specified site_id and series"""
+        self.session.execute(
+            delete(SensorDataModel)
+            .where(SensorDataModel.site_id == site_id)
+            .where(SensorDataModel.series == series)
+        )
+
     def get_site_average(
         self, series: Series, start: datetime.datetime, end: datetime.datetime
     ) -> list[SiteAverageSchema]:
@@ -64,23 +72,28 @@ class SensorRepository(AbstractSensorRepository):
         across the specified time period. Data is returned as list of site_code
         and average value.
         """
-        return self.session.execute(
+        query = (
             select(
-                SensorDataModel.site_code,
+                SiteModel.site_code.label("site_code"),
                 func.avg(SensorDataModel.value).label("value"),
             )
+            .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
             .filter(SensorDataModel.series == series)
             .filter(SensorDataModel.time >= start)
             .filter(SensorDataModel.time < end)
-            .group_by(SensorDataModel.site_code)
-            .order_by(SensorDataModel.site_code)
+            .group_by(SiteModel.site_code)
+            .order_by(SiteModel.site_code)
         )
 
-    def get_latest_date(self, site_code, series) -> datetime.datetime:
+        site_averages = self.session.execute(query)
+        SiteAveragesList = TypeAdapter(List[SiteAverageSchema])
+        return SiteAveragesList.validate_python(site_averages)
+
+    def get_latest_date(self, site_id: int, series: Series) -> datetime.datetime:
         reading = (
             self.session.execute(
                 select(SensorDataModel)
-                .filter(SensorDataModel.site_code == site_code)
+                .filter(SensorDataModel.site_id == site_id)
                 .filter(SensorDataModel.series == series)
                 .order_by(desc(SensorDataModel.time))
                 .limit(1)
@@ -98,9 +111,23 @@ class SensorRepository(AbstractSensorRepository):
         if source is not None:
             query = query.filter(SiteModel.source == source)
 
-        query = query.order_by(desc(SiteModel.site_code))
+        query = query.order_by(SiteModel.site_code)
+
         SiteList = TypeAdapter(List[SiteSchema])
-        return SiteList.validate_python(self.session.execute(query))
+        return SiteList.validate_python(self.session.execute(query).scalars())
+
+    def get_site(self, site_code: str) -> SiteSchema:
+        """Returns a single site object"""
+        site = (
+            self.session.execute(select(SiteModel).filter(SiteModel.site_code == site_code))
+            .scalars()
+            .one_or_none()
+        )
+
+        if site is None:
+            return None
+
+        return SiteSchema.model_validate(site)
 
     def update_sites(self, sites: list[SiteSchema]) -> None:
         """Updates sites on the repository (matched by site_code)

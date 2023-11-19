@@ -25,6 +25,9 @@ class FakeSensorRepository(AbstractSensorRepository):
             SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
         ]
 
+    def delete_data(self, series: Series, site_id: int) -> None:
+        raise NotImplementedError
+
     def get_site_average(
         self, series: Series, start: datetime.datetime, end: datetime.datetime
     ) -> list[SiteAverageSchema]:
@@ -33,7 +36,7 @@ class FakeSensorRepository(AbstractSensorRepository):
             SiteAverageSchema(site_code="CLDP0002", value=4.56),
         ]
 
-    def get_latest_date(self, site_code, series) -> datetime.datetime:
+    def get_latest_date(self, site_id: int, series: Series) -> datetime.datetime:
         return datetime.datetime(2020, 6, 5, 3, 2, 1)
 
     def get_sites(self, source: Source | None) -> list[SiteSchema]:
@@ -69,3 +72,6 @@ class FakeSensorRepository(AbstractSensorRepository):
                 borough="Lambeth",
             ),
         ]
+
+    def get_site(self, site_code: str) -> SiteSchema:
+        raise NotImplementedError

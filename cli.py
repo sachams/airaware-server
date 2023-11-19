@@ -1,19 +1,17 @@
 import datetime
 import json
-import logging
 
-import app_config
 import click
 from reproj_geojson import ReprojGeojson
 
 from server.database import SessionLocal
-from server.service.sensor_service import sync_sites as sensor_sync_sites
+from server.logging import configure_logging
+from server.service import SensorService
+from server.types import Series, Source
 from server.unit_of_work.unit_of_work import UnitOfWork
 
 # Configure logging
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logger = logging.getLogger("httpx")
-logger.setLevel(logging.WARNING)
+configure_logging()
 
 
 @click.group()
@@ -22,37 +20,30 @@ def cli():
 
 
 @cli.command()
-@click.option("--resync", required=False, default=False, is_flag=True)
-@click.option("--pause", required=False, default=0)
-@click.option("--start", required=False)
-def sync_all(resync, pause, start):
-    """Synchronises data between Breathe London and our datastore"""
-    datastore = PostgresDatastore(SessionLocal())
-
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    synchroniser = SiteSynchroniser(datastore, breathe_london)
-
-    synchroniser.sync_all(resync, pause, start)
-
-
-@cli.command()
 def sync_sites():
     """Syncs site data from remote sources to the database"""
     uow = UnitOfWork()
-    sensor_sync_sites(uow)
+    SensorService.sync_sites(uow)
 
 
 @cli.command()
 @click.argument("site_code", required=True)
-@click.argument("series", required=True)
+@click.argument("series", required=True, type=click.Choice(Series))
+@click.argument("source", required=True, type=click.Choice(Source))
 @click.option("--resync", required=False, default=False, is_flag=True)
-def sync(site_code, series, resync):
-    """Synchronises data between Breathe London and our datastore"""
-    datastore = PostgresDatastore(SessionLocal())
+def sync(site_code: str, series: Series, source: Source, resync: bool):
+    """Synchronises a single site between remote sources and our datastore"""
+    uow = UnitOfWork()
+    SensorService.sync_single_site_data(uow, site_code, None, source, series, resync)
 
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    synchroniser = SiteSynchroniser(datastore, breathe_london)
-    synchroniser.sync(site_code, series, resync)
+
+@cli.command()
+@click.option("--resync", required=False, default=False, is_flag=True)
+@click.option("--start", required=False)
+def sync_all(resync, start):
+    """Synchronises all data between remote sources and our datastore"""
+    uow = UnitOfWork()
+    SensorService.sync_all(uow, resync, start)
 
 
 @cli.command()

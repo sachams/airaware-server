@@ -2,10 +2,16 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app, get_unit_of_work
 
+from server.database import SessionLocal
 from server.repository.fake_geometry_repository import FakeGeometryRepository
 from server.repository.fake_request_repository import FakeRequestRepository
 from server.repository.fake_sensor_repository import FakeSensorRepository
 from server.unit_of_work.fake_unit_of_work import FakeUnitOfWork
+
+
+@pytest.fixture()
+def session():
+    return SessionLocal()
 
 
 @pytest.fixture()

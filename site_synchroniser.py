@@ -18,7 +18,7 @@ class SiteSynchroniser:
         for source in self.sources:
             logging.info(f"*** Starting {source.name} sync ***")
 
-            all_sites = source.get_sites()
+            all_sites = source.get_sites(None)
             logging.info(f"Found {len(all_sites)} sites")
 
             for site in all_sites:
@@ -44,14 +44,10 @@ class SiteSynchroniser:
         else:
             logging.info(f"[{site_code}:{series}] Sync started")
 
-        latest_date = (
-            None if resync else self.datastore.get_latest_date(site_code, series)
-        )
+        latest_date = None if resync else self.datastore.get_latest_date(site_code, series)
 
         if latest_date is not None:
-            logging.info(
-                f"[{site_code}:{series}] Latest datastore date is {latest_date}"
-            )
+            logging.info(f"[{site_code}:{series}] Latest datastore date is {latest_date}")
         else:
             logging.info(
                 f"[{site_code}:{series}] No data present in datastore or full resync triggered - loading from dawn of time"
@@ -80,9 +76,7 @@ class SiteSynchroniser:
                     continue
 
                 obj = SensorDataCreate(
-                    time=datetime.datetime.strptime(
-                        item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"
-                    ),
+                    time=datetime.datetime.strptime(item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"),
                     value=item["ScaledValue"],
                 )
                 data_schema.append(obj)

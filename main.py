@@ -1,24 +1,19 @@
 import datetime
-import logging
 from http import HTTPStatus
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from server.logging import configure_logging
 from server.schemas import SensorDataSchema, SiteAverageSchema
-from server.service.geometry_service import get_geometry
-from server.service.processing_result import ProcessingResult
-from server.service.request_service import log_request
-from server.service.sensor_service import get_data, get_site_average, get_sites
+from server.service import GeometryService, ProcessingResult, RequestService, SensorService
 from server.types import Frequency, Series
 from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
 from server.unit_of_work.unit_of_work import UnitOfWork
 
 # Configure logging
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logger = logging.getLogger("httpx")
-logger.setLevel(logging.WARNING)
+configure_logging()
 
 app = FastAPI()
 api_router = APIRouter()
@@ -48,7 +43,7 @@ def get_unit_of_work() -> AbstractUnitOfWork:
 
 def log_request_info(request: Request, uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
     """Logs each request to the database"""
-    log_request(uow, str(request.url), request.client.host)
+    RequestService.log_request(uow, str(request.url), request.client.host)
 
 
 @api_router.get("/sensor/{series}/{start}/{end}/{frequency}")
@@ -63,7 +58,7 @@ def get_sensor_data_route(
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
-    match get_data(
+    match SensorService.get_data(
         uow,
         series,
         start,
@@ -83,7 +78,7 @@ def get_site_average_route(
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
 ) -> list[SiteAverageSchema]:
     """Returns the list of all sites with the average levels for the periods given"""
-    match get_site_average(uow, series, start, end):
+    match SensorService.get_site_average(uow, series, start, end):
         case ProcessingResult.SUCCESS_RETRIEVED, items:
             return items
 
@@ -91,7 +86,7 @@ def get_site_average_route(
 @api_router.get("/sites")
 def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
     """Returns the list of all sites from known data sources"""
-    match get_sites(uow, None):
+    match SensorService.get_sites(uow, None):
         case ProcessingResult.SUCCESS_RETRIEVED, sites:
             return sites
 
@@ -100,7 +95,7 @@ def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
 def get_geometry_route(name: str, uow: AbstractUnitOfWork = Depends(get_unit_of_work)) -> dict:
     """Returns the named geometry. The name will have a .json extension added
     and will be searched for in the geometry folder"""
-    match get_geometry(uow, name):
+    match GeometryService.get_geometry(uow, name):
         case ProcessingResult.SUCCESS_RETRIEVED, geometry:
             return geometry
 
