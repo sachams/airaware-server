@@ -7,7 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from server.logging import configure_logging
 from server.schemas import SensorDataSchema, SiteAverageSchema
-from server.service import GeometryService, ProcessingResult, RequestService, SensorService
+from server.service import (
+    GeometryService,
+    ProcessingResult,
+    RequestService,
+    SensorService,
+)
 from server.types import Frequency, Series
 from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
 from server.unit_of_work.unit_of_work import UnitOfWork
@@ -25,6 +30,7 @@ origins = [
     "http://localhost:8080",
     "https://localhost",
     "https://localhost:8080",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -41,7 +47,9 @@ def get_unit_of_work() -> AbstractUnitOfWork:
     return UnitOfWork()
 
 
-def log_request_info(request: Request, uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
+def log_request_info(
+    request: Request, uow: AbstractUnitOfWork = Depends(get_unit_of_work)
+):
     """Logs each request to the database"""
     RequestService.log_request(uow, str(request.url), request.client.host)
 
@@ -92,7 +100,9 @@ def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
 
 
 @api_router.get("/geometry/{name}")
-def get_geometry_route(name: str, uow: AbstractUnitOfWork = Depends(get_unit_of_work)) -> dict:
+def get_geometry_route(
+    name: str, uow: AbstractUnitOfWork = Depends(get_unit_of_work)
+) -> dict:
     """Returns the named geometry. The name will have a .json extension added
     and will be searched for in the geometry folder"""
     match GeometryService.get_geometry(uow, name):
@@ -100,7 +110,9 @@ def get_geometry_route(name: str, uow: AbstractUnitOfWork = Depends(get_unit_of_
             return geometry
 
         case ProcessingResult.ERROR_NOT_FOUND:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=f"Unknown geometry {name}")
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND, detail=f"Unknown geometry {name}"
+            )
 
 
 @api_router.get("/healthcheck")
