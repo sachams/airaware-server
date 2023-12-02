@@ -31,9 +31,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 ####### dev stuff
 
 # Copy pdb config file to home directory to set default PDBPP behaviour
-COPY ./.pdbrc.py /root
-COPY dev_requirements.txt ./
-RUN pip install --no-cache-dir -r dev_requirements.txt
+# Uncomment lines below when building for dev
+# TODO: add separate dev Docker build target
+# COPY ./.pdbrc.py /root
+# COPY dev_requirements.txt ./
+# RUN pip install --no-cache-dir -r dev_requirements.txt
 
 COPY . ./
 

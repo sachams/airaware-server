@@ -13,7 +13,7 @@ from server.service import (
     RequestService,
     SensorService,
 )
-from server.types import Frequency, Series
+from server.types import Classification, Frequency, Series
 from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
 from server.unit_of_work.unit_of_work import UnitOfWork
 
@@ -62,19 +62,13 @@ def get_sensor_data_route(
     end: datetime.datetime,
     frequency: Frequency,
     codes: Annotated[list[str] | None, Query()] = None,
+    types: Annotated[list[Classification] | None, Query()] = None,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
 ) -> list[SensorDataSchema]:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
-    match SensorService.get_data(
-        uow,
-        series,
-        start,
-        end,
-        frequency,
-        codes,
-    ):
+    match SensorService.get_data(uow, series, start, end, frequency, codes, types):
         case ProcessingResult.SUCCESS_RETRIEVED, items:
             return items
 

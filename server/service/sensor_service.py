@@ -2,10 +2,15 @@ import datetime
 import logging
 import time
 
-from server.schemas import SensorDataCreateSchema, SensorDataSchema, SiteAverageSchema, SiteSchema
+from server.schemas import (
+    SensorDataCreateSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SiteSchema,
+)
 from server.service.processing_result import ProcessingResult
 from server.source.remote_sources import RemoteSources
-from server.types import Frequency, Series, Source
+from server.types import Classification, Frequency, Series, Source
 from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
 
 
@@ -18,9 +23,10 @@ class SensorService:
         end: datetime.datetime,
         frequency: Frequency,
         codes: list[str],
+        types: list[Classification],
     ) -> list[SensorDataSchema]:
         with uow:
-            items = uow.sensors.get_data(series, start, end, frequency, codes)
+            items = uow.sensors.get_data(series, start, end, frequency, codes, types)
             return ProcessingResult.SUCCESS_RETRIEVED, items
 
     @staticmethod
@@ -76,7 +82,9 @@ class SensorService:
             2. Reading data from the source after this date
             3. Writing this data to the datastore
             """
-            logging.info(f"[{site_code}:{series}] {'Resync' if resync else 'Sync'} started")
+            logging.info(
+                f"[{site_code}:{series}] {'Resync' if resync else 'Sync'} started"
+            )
 
             if site_id is None:
                 site = uow.sensors.get_site(site_code)
@@ -92,7 +100,9 @@ class SensorService:
 
             # If we're doing a resync, delete existing data for this site
             if resync:
-                logging.info(f"[{site_code}:{series}] Deleting existing data due to resync")
+                logging.info(
+                    f"[{site_code}:{series}] Deleting existing data due to resync"
+                )
                 uow.sensors.delete_data(series, site_id)
                 latest_date = datetime.datetime(2000, 1, 1)
             else:
@@ -122,11 +132,15 @@ class SensorService:
             data = remote_source.get_sensor_data(site_code, start, end, series)
             elapsed = time.time() - start_time
 
-            logging.info(f"[{site_code}:{series}] Found {len(data)} rows in {elapsed:.3f}s")
+            logging.info(
+                f"[{site_code}:{series}] Found {len(data)} rows in {elapsed:.3f}s"
+            )
 
             # We need to add in the site code and series on each record
             enriched = [
-                SensorDataCreateSchema(**item.model_dump(), site_id=site_id, series=series)
+                SensorDataCreateSchema(
+                    **item.model_dump(), site_id=site_id, series=series
+                )
                 for item in data
             ]
             start_time = time.time()
@@ -134,7 +148,9 @@ class SensorService:
             uow.commit()
             elapsed = time.time() - start_time
 
-            logging.info(f"[{site_code}:{series}] Data written to repository in {elapsed:.3f}s")
+            logging.info(
+                f"[{site_code}:{series}] Data written to repository in {elapsed:.3f}s"
+            )
 
             logging.info(f"[{site_code}:{series}] Sync complete")
 

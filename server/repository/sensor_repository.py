@@ -8,8 +8,13 @@ from sqlalchemy.orm import Session
 
 from server.models import SensorDataModel, SiteModel
 from server.repository.abstract_sensor_repository import AbstractSensorRepository
-from server.schemas import SensorDataCreateSchema, SensorDataSchema, SiteAverageSchema, SiteSchema
-from server.types import Frequency, Series, Source
+from server.schemas import (
+    SensorDataCreateSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SiteSchema,
+)
+from server.types import Classification, Frequency, Series, Source
 
 
 class SensorRepository(AbstractSensorRepository):
@@ -31,6 +36,7 @@ class SensorRepository(AbstractSensorRepository):
         end: datetime.datetime,
         frequency: Frequency,
         codes: list[str] | None,
+        types: list[Classification] | None,
     ) -> list[SensorDataSchema]:
         """Reads data from the datastore, averaging across the specified sites. If no
         sites are specified, it averages across all sites.
@@ -45,10 +51,16 @@ class SensorRepository(AbstractSensorRepository):
             .filter(SensorDataModel.time < end)
         )
 
-        # If we have been supplied a list of site codes, join with the Site table
-        # and filter by site code
-        if codes:
-            query = query.join(SiteModel).filter(SiteModel.site_code.in_(codes))
+        # If we have been supplied a list of site codes or types, join with the Site table
+        # and filter by site code and/or type
+        if codes or types:
+            query = query.join(SiteModel)
+
+            if codes:
+                query = query.filter(SiteModel.site_code.in_(codes))
+
+            if types:
+                query = query.filter(SiteModel.site_type.in_(types))
 
         query = query.group_by(
             func.date_trunc(frequency.value, SensorDataModel.time).label("time")
@@ -119,7 +131,9 @@ class SensorRepository(AbstractSensorRepository):
     def get_site(self, site_code: str) -> SiteSchema:
         """Returns a single site object"""
         site = (
-            self.session.execute(select(SiteModel).filter(SiteModel.site_code == site_code))
+            self.session.execute(
+                select(SiteModel).filter(SiteModel.site_code == site_code)
+            )
             .scalars()
             .one_or_none()
         )

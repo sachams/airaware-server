@@ -11,6 +11,30 @@
     }),
   ])
 # ---
+# name: test_get_data_site_code
+  list([
+    dict({
+      'time': '2020-06-05T03:02:01',
+      'value': 1.23,
+    }),
+    dict({
+      'time': '2020-06-05T03:02:01',
+      'value': 1.23,
+    }),
+  ])
+# ---
+# name: test_get_data_type
+  list([
+    dict({
+      'time': '2020-06-05T03:02:01',
+      'value': 1.23,
+    }),
+    dict({
+      'time': '2020-06-05T03:02:01',
+      'value': 1.23,
+    }),
+  ])
+# ---
 # name: test_get_site_average
   list([
     dict({

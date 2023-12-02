@@ -1,7 +1,12 @@
 import datetime
 
 from server.repository.abstract_sensor_repository import AbstractSensorRepository
-from server.schemas import SensorDataCreateSchema, SensorDataSchema, SiteAverageSchema, SiteSchema
+from server.schemas import (
+    SensorDataCreateSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SiteSchema,
+)
 from server.types import Classification, Frequency, Series, SiteStatus, Source
 
 
@@ -19,6 +24,7 @@ class FakeSensorRepository(AbstractSensorRepository):
         end: datetime.datetime,
         frequency: Frequency,
         codes: list[str],
+        types: list[Classification],
     ) -> list[SensorDataSchema]:
         return [
             SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),

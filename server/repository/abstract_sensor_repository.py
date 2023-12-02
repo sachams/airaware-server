@@ -1,8 +1,13 @@
 import abc
 import datetime
 
-from server.schemas import SensorDataCreateSchema, SensorDataSchema, SiteAverageSchema, SiteSchema
-from server.types import Frequency, Series, Source
+from server.schemas import (
+    SensorDataCreateSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SiteSchema,
+)
+from server.types import Classification, Frequency, Series, Source
 
 
 class AbstractSensorRepository(abc.ABC):
@@ -18,6 +23,7 @@ class AbstractSensorRepository(abc.ABC):
         end: datetime.datetime,
         frequency: Frequency,
         codes: list[str],
+        types: list[Classification],
     ) -> list[SensorDataSchema]:
         raise NotImplementedError
 
