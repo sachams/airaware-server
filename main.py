@@ -31,6 +31,7 @@ origins = [
     "https://localhost",
     "https://localhost:8080",
     "http://localhost:3000",
+    "https://airaware-ui.fly.dev",
 ]
 
 app.add_middleware(
