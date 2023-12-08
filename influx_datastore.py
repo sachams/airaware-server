@@ -1,12 +1,8 @@
 import logging
 import pyarrow as pa
-import datetime
 
 from influxdb_client_3 import (
     InfluxDBClient3,
-    write_client_options,
-    WriteOptions,
-    InfluxDBError,
     Point,
 )
 
@@ -21,9 +17,7 @@ class InfluxDatastore:
         #                             WriteOptions=write_options)
         # self.table = "test_table"
         logging.info(f"Connecting to {database} on {host} at {org}")
-        self.client = InfluxDBClient3(
-            host=host, token=token, org=org, database=database
-        )
+        self.client = InfluxDBClient3(host=host, token=token, org=org, database=database)
 
     # def success(self, conf, data: str):
     #     print(f"Written batch: {conf}, data: {data}")
@@ -56,11 +50,7 @@ class InfluxDatastore:
 
     def _parse(self, series, data):
         """Converts the JSON input data into an array of InfluxDB Points"""
-        points = [
-            self._parse_row(series, row)
-            for row in data
-            if row["ScaledValue"] is not None
-        ]
+        points = [self._parse_row(series, row) for row in data if row["ScaledValue"] is not None]
         return points
 
     def write_data(self, series, data):
@@ -93,12 +83,10 @@ class InfluxDatastore:
         site_clause = ""
 
         if site_codes:
-            formatted_site_codes = ",".join(
-                [f"'{site_code}'" for site_code in site_codes]
-            )
+            formatted_site_codes = ",".join([f"'{site_code}'" for site_code in site_codes])
             site_clause = f"and site_code in ({formatted_site_codes})"
 
-        match (frequency):
+        match frequency:
             case "hourly":
                 query = (
                     "select time, avg(value) as 'value' "
@@ -184,7 +172,7 @@ class InfluxDatastore:
 
         try:
             last_date = self.client.query(query=query, language="sql")[0][0].as_py()
-        except pa.lib.ArrowInvalid as e:
+        except pa.lib.ArrowInvalid:
             # This indicates the table can't be found
             return None
 

@@ -1,32 +1,24 @@
-import json
-import os
 import datetime
-import logging
-from fastapi import (
-    Depends,
-    FastAPI,
-    Response,
-    status,
-    Query,
-    HTTPException,
-    APIRouter,
-    Request,
-)
-from fastapi.responses import JSONResponse
-from typing import Annotated, Tuple
-from breathe_london import BreatheLondon
-from pydantic import BaseModel
+from http import HTTPStatus
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from server.postgres_datastore import PostgresDatastore
-import app_config
-from server.database import SessionLocal, engine
-from sqlalchemy.orm import Session
-from server.schemas import SensorData, SiteAverage
+
+from server.logging import configure_logging
+from server.schemas import SensorDataSchema, SiteAverageSchema
+from server.service import (
+    GeometryService,
+    ProcessingResult,
+    RequestService,
+    SensorService,
+)
+from server.types import Classification, Frequency, Series
+from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
+from server.unit_of_work.unit_of_work import UnitOfWork
 
 # Configure logging
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logger = logging.getLogger("httpx")
-logger.setLevel(logging.WARNING)
+configure_logging()
 
 app = FastAPI()
 api_router = APIRouter()
@@ -38,6 +30,8 @@ origins = [
     "http://localhost:8080",
     "https://localhost",
     "https://localhost:8080",
+    "http://localhost:3000",
+    "https://airaware-ui.fly.dev",
 ]
 
 app.add_middleware(
@@ -50,105 +44,70 @@ app.add_middleware(
 
 
 # Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def get_unit_of_work() -> AbstractUnitOfWork:
+    return UnitOfWork()
 
 
-def log_request_info(request: Request, db: Session = Depends(get_db)):
+def log_request_info(
+    request: Request, uow: AbstractUnitOfWork = Depends(get_unit_of_work)
+):
     """Logs each request to the database"""
-    datastore = PostgresDatastore(db)
-    datastore.write_request_log(str(request.url), request.client.host)
-
-
-def sanitise_timestamp(dt):
-    """Sanitises datetime inputs"""
-
-    # If the format includes milliseconds, strip them
-    # eg, 2023-08-23T00:00:00.000Z
-    return dt.split(".")[0]
+    RequestService.log_request(uow, str(request.url), request.client.host)
 
 
 @api_router.get("/sensor/{series}/{start}/{end}/{frequency}")
-def get_sensor_data(
-    series: str,
-    start: str,
-    end: str,
-    frequency: str,
-    response: Response,
-    site: Annotated[list[str] | None, Query()] = None,
-    db: Session = Depends(get_db),
-) -> list[SensorData] | dict:
+def get_sensor_data_route(
+    series: Series,
+    start: datetime.datetime,
+    end: datetime.datetime,
+    frequency: Frequency,
+    codes: Annotated[list[str] | None, Query()] = None,
+    types: Annotated[list[Classification] | None, Query()] = None,
+    uow: AbstractUnitOfWork = Depends(get_unit_of_work),
+) -> list[SensorDataSchema]:
     """Returns sensor data, averaged across either all sites (if no
     `site` query parameters are specified), or just the specified
     sites"""
-    series = series.upper()
-    if series != "NO2" and series != "PM25":
-        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
-
-    frequency = frequency.lower()
-    if frequency != "hourly" and frequency != "daily":
-        raise HTTPException(status_code=400, detail=f"Invalid frequency {frequency}")
-
-    datastore = PostgresDatastore(db)
-
-    data = datastore.read_data(
-        series,
-        datetime.datetime.fromisoformat(sanitise_timestamp(start)),
-        datetime.datetime.fromisoformat(sanitise_timestamp(end)),
-        site,
-        frequency,
-    )
-
-    return data
+    match SensorService.get_data(uow, series, start, end, frequency, codes, types):
+        case ProcessingResult.SUCCESS_RETRIEVED, items:
+            return items
 
 
 @api_router.get("/site_average/{series}/{start}/{end}")
-def get_site_average(
-    series: str,
-    start: str,
-    end: str,
-    db: Session = Depends(get_db),
-) -> list[SiteAverage] | dict:
+def get_site_average_route(
+    series: Series,
+    start: datetime.datetime,
+    end: datetime.datetime,
+    uow: AbstractUnitOfWork = Depends(get_unit_of_work),
+) -> list[SiteAverageSchema]:
     """Returns the list of all sites with the average levels for the periods given"""
-    series = series.upper()
-    if series != "NO2" and series != "PM25":
-        raise HTTPException(status_code=400, detail=f"Invalid series {series}")
-
-    datastore = PostgresDatastore(db)
-
-    data = datastore.read_site_average(
-        series,
-        datetime.datetime.fromisoformat(sanitise_timestamp(start)),
-        datetime.datetime.fromisoformat(sanitise_timestamp(end)),
-    )
-
-    return data
+    match SensorService.get_site_average(uow, series, start, end):
+        case ProcessingResult.SUCCESS_RETRIEVED, items:
+            return items
 
 
-@api_router.get("/site_info")
-def get_site_info():
-    """Returns the list of all sites from the Breathe London API. Note
-    that the site list is cached for 24h"""
-    breathe_london = BreatheLondon(app_config.breathe_london_api_key)
-    return breathe_london.get_sites()
+@api_router.get("/sites")
+def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
+    """Returns the list of all sites from known data sources"""
+    match SensorService.get_sites(uow, None):
+        case ProcessingResult.SUCCESS_RETRIEVED, sites:
+            return sites
 
 
 @api_router.get("/geometry/{name}")
-def get_geometry(name: str) -> str | dict:
+def get_geometry_route(
+    name: str, uow: AbstractUnitOfWork = Depends(get_unit_of_work)
+) -> dict:
     """Returns the named geometry. The name will have a .json extension added
     and will be searched for in the geometry folder"""
-    path = f"geometry/{name}.json"
+    match GeometryService.get_geometry(uow, name):
+        case ProcessingResult.SUCCESS_RETRIEVED, geometry:
+            return geometry
 
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail=f"Invalid geometry {name}")
-
-    with open(path, "r") as geometry_file:
-        geometry = json.load(geometry_file)
-        return geometry
+        case ProcessingResult.ERROR_NOT_FOUND:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND, detail=f"Unknown geometry {name}"
+            )
 
 
 @api_router.get("/healthcheck")

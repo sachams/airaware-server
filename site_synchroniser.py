@@ -3,32 +3,35 @@ import logging
 import time
 
 from server.schemas import SensorDataCreate
+from server.types import Series
 
 
 class SiteSynchroniser:
     def __init__(self, datastore, breathe_london):
         self.datastore = datastore
-        self.breathe_london = breathe_london
+        self.sources = [breathe_london]
 
     def sync_all(self, resync, pause, start):
-        """Syncs all sites and series from BreatheLondon to the datastore"""
-        logging.info("*** Starting BreatheLondon sync ***")
-        all_sites = self.breathe_london.get_sites()
-        logging.info(f"Found {len(all_sites)} sites")
+        """Syncs all sites and series from all sources to the datastore"""
+        all_series = [Series.pm25, Series.no2]
 
-        all_series = ["PM25", "NO2"]
+        for source in self.sources:
+            logging.info(f"*** Starting {source.name} sync ***")
 
-        for site in all_sites:
-            if start is not None and site["SiteCode"] < start:
-                logging.info(f"Skipping site {site['SiteCode']}")
-                continue
+            all_sites = source.get_sites(None)
+            logging.info(f"Found {len(all_sites)} sites")
 
-            for series in all_series:
-                self.sync(site["SiteCode"], series, resync)
-                logging.info(f"Pausing for {pause}s")
-                time.sleep(pause)
+            for site in all_sites:
+                if start is not None and site["SiteCode"] < start:
+                    logging.info(f"Skipping site {site['SiteCode']}")
+                    continue
 
-        logging.info("*** BreatheLondon sync complete ***")
+                for series in all_series:
+                    self.sync(site["SiteCode"], series, resync)
+                    logging.info(f"Pausing for {pause}s")
+                    time.sleep(pause)
+
+            logging.info(f"*** {source.name} sync complete ***")
 
     def sync(self, site_code, series, resync):
         """SYnchronises data from BL to the datastore by:
@@ -41,14 +44,10 @@ class SiteSynchroniser:
         else:
             logging.info(f"[{site_code}:{series}] Sync started")
 
-        latest_date = (
-            None if resync else self.datastore.get_latest_date(site_code, series)
-        )
+        latest_date = None if resync else self.datastore.get_latest_date(site_code, series)
 
         if latest_date is not None:
-            logging.info(
-                f"[{site_code}:{series}] Latest datastore date is {latest_date}"
-            )
+            logging.info(f"[{site_code}:{series}] Latest datastore date is {latest_date}")
         else:
             logging.info(
                 f"[{site_code}:{series}] No data present in datastore or full resync triggered - loading from dawn of time"
@@ -77,9 +76,7 @@ class SiteSynchroniser:
                     continue
 
                 obj = SensorDataCreate(
-                    time=datetime.datetime.strptime(
-                        item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"
-                    ),
+                    time=datetime.datetime.strptime(item["DateTime"], "%Y-%m-%dT%H:%M:%S.000Z"),
                     value=item["ScaledValue"],
                 )
                 data_schema.append(obj)
