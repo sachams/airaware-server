@@ -29,6 +29,7 @@ def test_get_sites(httpx_mock, site_response):
     assert sites[0].longitude == pytest.approx(-0.059463899582624435)
     assert sites[0].site_type == Classification.urban_background
     assert sites[0].source == Source.breathe_london
+    assert sites[0].is_enabled is True
 
     assert sites[0].photo_url == "https://api.breathelondon.org/assets/images/CLDP0001.jpg"
     assert sites[0].description == "The Royal London Hospital is home..."

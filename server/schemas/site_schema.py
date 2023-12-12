@@ -16,6 +16,7 @@ class SiteBaseSchema(BaseModel):
     source: Source
 
     # Optional fields
+    is_enabled: bool | None
     photo_url: str | None
     description: str | None
     start_date: datetime.datetime | None

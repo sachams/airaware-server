@@ -21,6 +21,7 @@ class SiteModel(Base):
     source: Mapped[Source]
 
     # Optional fields
+    is_enabled: Mapped[bool | None]
     photo_url: Mapped[str | None]
     description: Mapped[str | None]
     start_date: Mapped[datetime.datetime | None] = mapped_column(

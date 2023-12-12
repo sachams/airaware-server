@@ -3,8 +3,8 @@ import logging
 import time
 
 import httpx
-from borough_mapper import BoroughMapper
 
+from borough_mapper import BoroughMapper
 from server.schemas import SensorDataRemoteSchema, SiteCreateSchema
 from server.types import Classification, Series, SiteStatus, Source
 
@@ -68,6 +68,9 @@ class BreatheLondon:
             case _:
                 return SiteStatus.unknown
 
+    def _get_enabled_flag(self, enabled):
+        return enabled.lower() == "y"
+
     def _get_classification_enum(self, classification):
         # Convert to lower case before matching.
         if classification is None:
@@ -116,6 +119,7 @@ class BreatheLondon:
                 start_date=self._from_isoformat_utc(site["StartDate"]),
                 end_date=self._from_isoformat_utc(site["EndDate"]),
                 borough=self.borough_mapper.get_borough(site["Latitude"], site["Longitude"]),
+                is_enabled=self._get_enabled_flag(site["Enabled"])
             )
 
             all_sites.append(obj)
