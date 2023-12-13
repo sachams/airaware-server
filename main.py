@@ -32,6 +32,7 @@ origins = [
     "https://localhost:8080",
     "http://localhost:3000",
     "https://airaware-ui.fly.dev",
+    "https://air-aware.org",
 ]
 
 app.add_middleware(
