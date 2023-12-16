@@ -61,6 +61,7 @@ class FakeSensorRepository(AbstractSensorRepository):
                 start_date=datetime.datetime(2020, 6, 5, 3, 2, 1),
                 end_date=datetime.datetime(2022, 6, 5, 3, 2, 1),
                 borough="Lambeth",
+                is_enabled=True
             ),
             SiteSchema(
                 site_id=2,
@@ -76,6 +77,7 @@ class FakeSensorRepository(AbstractSensorRepository):
                 start_date=datetime.datetime(2022, 6, 5, 3, 2, 1),
                 end_date=None,
                 borough="Lambeth",
+                is_enabled=False
             ),
         ]
 
