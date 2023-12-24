@@ -7,7 +7,7 @@ The AirAware server is a FastAPI-based web server that stores air quality data i
 ### Export to requirements.txt
 
 ```sh
-poetry export -f requirements.txt --output requirements.txt
+poetry export --without-hashes -f requirements.txt --output requirements.txt
 ```
 
 ### Start a fly database proxy
@@ -40,3 +40,8 @@ fly postgres create --image-ref flyio/postgres:14.4
 
 ```sh
 ```
+
+
+# Redis URL
+
+redis://default:9faf0729ab8d4e959c7e4441536110b4@fly-air-aware-redis.upstash.io:6379

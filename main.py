@@ -2,9 +2,15 @@ import datetime
 from http import HTTPStatus
 from typing import Annotated
 
+import redis.asyncio as redis
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+from redis.asyncio.connection import ConnectionPool
 
+import app_config
 from server.logging import configure_logging
 from server.schemas import SensorDataSchema, SiteAverageSchema
 from server.service import (
@@ -44,6 +50,14 @@ app.add_middleware(
 )
 
 
+# Initialise redis
+@app.on_event("startup")
+async def startup():
+    pool = ConnectionPool.from_url(url=app_config.redis_url)
+    r = redis.Redis(connection_pool=pool)
+    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+    
+
 # Dependency
 def get_unit_of_work() -> AbstractUnitOfWork:
     return UnitOfWork()
@@ -75,6 +89,7 @@ def get_sensor_data_route(
 
 
 @api_router.get("/site_average/{series}/{start}/{end}")
+@cache(expire=60*60*6)  # 6h
 def get_site_average_route(
     series: Series,
     start: datetime.datetime,
@@ -88,6 +103,7 @@ def get_site_average_route(
 
 
 @api_router.get("/sites")
+@cache(expire=60*60*6)  # 6h
 def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
     """Returns the list of all sites from known data sources"""
     match SensorService.get_sites(uow, None):
