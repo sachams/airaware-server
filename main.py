@@ -3,7 +3,7 @@ from http import HTTPStatus
 from typing import Annotated
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
@@ -50,6 +50,21 @@ app.add_middleware(
 )
 
 
+def request_key_builder(
+    func,
+    namespace: str = "",
+    request: Request = None,
+    response: Response = None,
+    *args,
+    **kwargs,
+):
+    return ":".join([
+        namespace,
+        request.method.lower(),
+        request.url.path,
+        repr(sorted(request.query_params.items()))
+    ])
+
 # Initialise redis
 @app.on_event("startup")
 async def startup():
@@ -89,7 +104,7 @@ def get_sensor_data_route(
 
 
 @api_router.get("/site_average/{series}/{start}/{end}")
-@cache(expire=60*60*6)  # 6h
+@cache(expire=60*60*6, key_builder=request_key_builder)  # 6h
 def get_site_average_route(
     series: Series,
     start: datetime.datetime,
@@ -103,7 +118,7 @@ def get_site_average_route(
 
 
 @api_router.get("/sites")
-@cache(expire=60*60*6)  # 6h
+@cache(expire=60*60*6, key_builder=request_key_builder)  # 6h
 def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
     """Returns the list of all sites from known data sources"""
     match SensorService.get_sites(uow, None):
