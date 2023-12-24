@@ -1,10 +1,10 @@
 import json
 
 import click
-from reproj_geojson import ReprojGeojson
 
+from reproj_geojson import ReprojGeojson
 from server.logging import configure_logging
-from server.service import SensorService
+from server.service import ProcessingResult, SensorService
 from server.types import Series, Source
 from server.unit_of_work.unit_of_work import UnitOfWork
 
@@ -56,6 +56,23 @@ def reproject_geojson(src_filename, dest_filename, src_proj, dest_proj):
         src_geojson = json.load(src_file)
         dest_geojson = ReprojGeojson.transform(src_geojson, src_proj, dest_proj)
         json.dump(dest_geojson, dest_file, indent=2)
+
+
+@cli.command()
+@click.argument("year", required=True, type=int)
+def wrapped(year):
+    """Generates Wrapped summary statistics for the specified year"""
+    import json
+
+    from pydantic.json import pydantic_encoder
+    
+    uow = UnitOfWork()
+
+    match SensorService.generate_wrapped(uow, year):
+        case ProcessingResult.SUCCESS_RETRIEVED, data:
+            with open(f"wrapped_{year}.json", "w") as file:
+                json_data = json.dumps(data, default=pydantic_encoder)
+                file.write(json_data)
 
 
 if __name__ == "__main__":

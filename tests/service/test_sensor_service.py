@@ -18,3 +18,6 @@ def test_sync_single_site_data(httpx_mock, fake_uow, sensor_data_response, senso
     assert type(sensor_repository.data[0]) is SensorDataCreateSchema
     assert sensor_repository.data[0].time == datetime.datetime(2022, 1, 1, 0, 0)
     assert sensor_repository.data[0].value == pytest.approx(28.38500068664551)
+
+def test_generate_wrapped(fake_uow, sensor_repository):
+    result, data = SensorService.generate_wrapped(fake_uow, 2023)

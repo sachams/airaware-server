@@ -1,5 +1,6 @@
 import datetime
 import logging
+from collections import defaultdict
 from typing import List
 
 from pydantic import TypeAdapter
@@ -9,6 +10,9 @@ from sqlalchemy.orm import Session
 from server.models import SensorDataModel, SiteModel
 from server.repository.abstract_sensor_repository import AbstractSensorRepository
 from server.schemas import (
+    BreachSchema,
+    HeatmapSchema,
+    RankSchema,
     SensorDataCreateSchema,
     SensorDataSchema,
     SiteAverageSchema,
@@ -164,3 +168,160 @@ class SensorRepository(AbstractSensorRepository):
             else:
                 new_obj.site_id = existing_site.site_id
                 self.session.merge(new_obj)
+
+    def get_heatmap(
+        self,
+        series: Series,
+        start: datetime.datetime,
+        end: datetime.datetime,
+    ) -> dict[str, HeatmapSchema]:
+        """Gets heatmap data for the specified series by hour of day and day of week, for all
+        sites.
+        """
+        query = (
+            select(
+                SiteModel.site_code,
+                func.date_part("dow", SensorDataModel.time).label("day"),
+                func.date_part("hour", SensorDataModel.time).label("hour"),
+                func.avg(SensorDataModel.value).label("value"),
+            )
+            .filter(SensorDataModel.series == series.name)
+            .filter(SensorDataModel.time >= start)
+            .filter(SensorDataModel.time < end)
+            .filter(SiteModel.is_enabled == True)
+            .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
+            .group_by(SiteModel.site_code)
+            .group_by(func.date_part("dow", SensorDataModel.time).label("day"))
+            .group_by(func.date_part("hour", SensorDataModel.time).label("hour"))
+            .order_by(SiteModel.site_code)
+        )
+
+        # Return a dict of heatmap data, keyed by site_code
+        result = self.session.execute(query)
+        data = defaultdict(list)
+        for row in result:
+            data[row.site_code].append(HeatmapSchema(hour=row.hour, day=row.day, value=row.value))
+
+        return data
+
+    def get_breach(
+        self,
+        series: Series,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        threshold: float
+    ) -> dict[str, BreachSchema]:
+        """Gets the number of days the daily average is above the speficied threshold for each
+        site.
+        """
+        daily_avg_subquery = (
+            select(
+                SiteModel.site_code,
+                func.date_trunc("day", SensorDataModel.time).label('date'),
+                func.avg(SensorDataModel.value).label("average"),
+            )
+            .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
+            .filter(SensorDataModel.series == series.name)
+            .filter(SensorDataModel.time >= start)
+            .filter(SensorDataModel.time < end)
+            .filter(SiteModel.is_enabled == True)
+            .group_by(SiteModel.site_code)
+            .group_by(func.date_trunc("day", SensorDataModel.time))
+            .subquery()
+        )
+
+        breach_query = (
+            select(
+                daily_avg_subquery.c.site_code,
+                func.count(daily_avg_subquery.c.date).label("count")
+            )
+            .filter(daily_avg_subquery.c.average > threshold)
+            .group_by(daily_avg_subquery.c.site_code)
+            .order_by(daily_avg_subquery.c.site_code)
+            .subquery()
+        )
+
+        breach_final_query = (
+            select(
+                SiteModel.site_code,
+                breach_query.c.count
+            )
+            .join_from(SiteModel, breach_query, SiteModel.site_code == breach_query.c.site_code, isouter=True)
+            .filter(SiteModel.is_enabled == True)
+        )
+
+        ok_query = (
+            select(
+                daily_avg_subquery.c.site_code,
+                func.count(daily_avg_subquery.c.date).label("count")
+            )
+            .filter(daily_avg_subquery.c.average <= threshold)
+            .group_by(daily_avg_subquery.c.site_code)
+            .order_by(daily_avg_subquery.c.site_code)
+            .subquery()
+        )
+
+        ok_final_query = (
+            select(
+                SiteModel.site_code,
+                ok_query.c.count
+            )
+            .join_from(SiteModel, ok_query, SiteModel.site_code == ok_query.c.site_code, isouter=True)
+            .filter(SiteModel.is_enabled == True)
+        )
+
+        # Return a list of breach data, keyed by site_code
+        total_days = (end - start).days
+        # Make sure breach and ok fields are populated - they might not be if no values were
+        # (not) breached
+        data = defaultdict(lambda: defaultdict(int))
+
+        result = self.session.execute(breach_final_query)
+        for row in result:
+            data[row.site_code]["breach"] = row.count if row.count is not None else 0
+
+        result = self.session.execute(ok_final_query)
+        for row in result:
+            data[row.site_code]["ok"] = row.count if row.count is not None else 0
+
+        for _, obj in data.items():
+            # if "breach" not in obj:
+            #     obj["breach"] = 0
+
+            # if "ok" not in obj:
+            #     obj["breach"] = 0
+
+            obj["no_data"] = total_days - obj["breach"] - obj["ok"]
+
+        return data
+
+    def get_rank(
+        self,
+        series: Series,
+        start: datetime.datetime,
+        end: datetime.datetime,
+    ) -> dict[str, RankSchema]:
+        """Gets the average over the period, and the rank of each site (1 = lowest)
+        """
+        query = (
+            select(
+                SiteModel.site_code,
+                func.avg(SensorDataModel.value).label("average"),
+                func.row_number().over(order_by=func.avg(SensorDataModel.value)).label("rank")
+            )
+            .join(SiteModel)
+            .filter(SensorDataModel.series == series.name)
+            .filter(SensorDataModel.time >= start)
+            .filter(SensorDataModel.time < end)
+            .filter(SiteModel.is_enabled == True)
+            .group_by(SiteModel.site_code)
+        )
+
+        # Return a dict of rank data, keyed by site_code
+        result = self.session.execute(query)
+
+        data = defaultdict(list)
+        for row in result:
+            data[row.site_code] = RankSchema(rank=row.rank, value=row.average)
+
+        return data
