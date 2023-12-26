@@ -1,7 +1,9 @@
+from unittest import mock
+
 import pytest
 from fastapi.testclient import TestClient
-from main import app, get_unit_of_work
 
+from main import app, get_unit_of_work
 from server.database import SessionLocal
 from server.repository.fake_geometry_repository import FakeGeometryRepository
 from server.repository.fake_request_repository import FakeRequestRepository
@@ -9,6 +11,18 @@ from server.repository.fake_sensor_repository import FakeSensorRepository
 from server.unit_of_work.fake_unit_of_work import FakeUnitOfWork
 
 
+# Make pytest work with the redis cache, see
+# https://github.com/long2ice/fastapi-cache/issues/49#issuecomment-1139560033
+# TODO: this fix doesn't seem to work. Fix.
+def mock_cache():
+    mock.patch("fastapi_cache.decorator.cache", lambda *args, **kwargs: lambda f: f).start()
+
+
+def pytest_sessionstart(session):
+    import pdb; pdb.set_trace()
+    
+    mock_cache()
+    
 @pytest.fixture()
 def session():
     return SessionLocal()
