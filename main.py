@@ -86,7 +86,7 @@ def request_key_builder(
 async def startup():
     pool = ConnectionPool.from_url(url=app_config.redis_url)
     r = redis.Redis(connection_pool=pool)
-    enable_cache = bool(int(os.environ.get("ENABLE_CACHE", "0")))
+    enable_cache = bool(int(os.environ.get("ENABLE_CACHE", "1")))
     FastAPICache.init(RedisBackend(r), prefix="fastapi-cache", enable=enable_cache)
 
 
