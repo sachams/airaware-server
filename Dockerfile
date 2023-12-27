@@ -1,5 +1,5 @@
 # https://hub.docker.com/_/python
-FROM python:3.10-slim-bullseye
+FROM python:3.10-slim-bullseye as base
 
 ENV PYTHONUNBUFFERED True
 ENV APP_HOME /app
@@ -28,15 +28,17 @@ COPY requirements.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-####### dev stuff
-
-# Copy pdb config file to home directory to set default PDBPP behaviour
-# Uncomment lines below when building for dev
-# TODO: add separate dev Docker build target
-# COPY ./.pdbrc.py /root
-# COPY dev_requirements.txt ./
-# RUN pip install --no-cache-dir -r dev_requirements.txt
-
 COPY . ./
 
+##### release target #####
+FROM base as release
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+
+##### test target #####
+FROM base as test
+
+# Copy pdb config file to home directory to set default PDBPP behaviour
+COPY ./.pdbrc.py /root
+COPY dev_requirements.txt ./
+RUN pip install --no-cache-dir -r dev_requirements.txt
