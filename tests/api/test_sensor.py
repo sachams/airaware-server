@@ -54,4 +54,3 @@ def test_get_site_average_db_exception(client, mocker, sensor_repository):
 
     response = client.get("/site_average/pm25/2022-01-01T10:00:00/2022-02-01T10:00:00")
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
-    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR

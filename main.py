@@ -1,4 +1,5 @@
 import datetime
+import os
 from http import HTTPStatus
 from typing import Annotated
 
@@ -85,7 +86,8 @@ def request_key_builder(
 async def startup():
     pool = ConnectionPool.from_url(url=app_config.redis_url)
     r = redis.Redis(connection_pool=pool)
-    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+    enable_cache = bool(int(os.environ.get("ENABLE_CACHE", "0")))
+    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache", enable=enable_cache)
 
 
 # Dependency
