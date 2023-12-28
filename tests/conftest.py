@@ -1,3 +1,4 @@
+import os
 from unittest import mock
 
 import pytest
@@ -11,18 +12,6 @@ from server.repository.fake_sensor_repository import FakeSensorRepository
 from server.unit_of_work.fake_unit_of_work import FakeUnitOfWork
 
 
-# Make pytest work with the redis cache, see
-# https://github.com/long2ice/fastapi-cache/issues/49#issuecomment-1139560033
-# TODO: this fix doesn't seem to work. Fix.
-def mock_cache():
-    mock.patch("fastapi_cache.decorator.cache", lambda *args, **kwargs: lambda f: f).start()
-
-
-def pytest_sessionstart(session):
-    import pdb; pdb.set_trace()
-    
-    mock_cache()
-    
 @pytest.fixture()
 def session():
     return SessionLocal()
@@ -141,7 +130,10 @@ def site_response():
 @pytest.fixture(scope="session")
 def client():
     """Returns a FastAPI test client"""
-    return TestClient(app, raise_server_exceptions=False)
+    # Disable the Redis cache when under pytest
+    os.environ["ENABLE_CACHE"] = "0"
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
 
 
 @pytest.fixture(scope="function")

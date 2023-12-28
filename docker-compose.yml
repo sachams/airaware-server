@@ -32,6 +32,7 @@ services:
       - "8080:8080"
     build:
       context: ${PWD}
+      target: test
     environment:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: postgres

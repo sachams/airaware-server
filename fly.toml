@@ -7,6 +7,7 @@ app = "breathe-air"
 primary_region = "lhr"
 
 [build]
+  build-target = "release"
 
 [http_service]
   internal_port = 8080
