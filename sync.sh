@@ -1,2 +1,2 @@
 python cli.py sync-sites
-python cli.py sync-all --pause 0
+python cli.py sync-all
