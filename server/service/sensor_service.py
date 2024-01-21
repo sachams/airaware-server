@@ -2,11 +2,13 @@ import datetime
 import logging
 import time
 
+from app_config import daily_limits
 from server.schemas import (
     SensorDataCreateSchema,
     SensorDataSchema,
     SiteAverageSchema,
     SiteSchema,
+    WrappedSchema,
 )
 from server.service.processing_result import ProcessingResult
 from server.source.remote_sources import RemoteSources
@@ -178,3 +180,65 @@ class SensorService:
                 )
 
             logging.info(f"*** {site.site_code} sync complete ***")
+
+    @staticmethod
+    def generate_wrapped(uow: AbstractUnitOfWork, year: int) -> list[WrappedSchema]:
+        """Generates and returns a dict of summary statistics for the given year"""
+        with uow:
+            start = datetime.datetime(year, 1, 1)
+            end = datetime.datetime(year+1, 1, 1)
+
+            logging.info(f"*** Starting wrapped generation for {year}")
+
+            # Load site data - only load enabled sites
+            logging.info("Loading site data")
+            sites = list(filter(lambda x: x.is_enabled, uow.sensors.get_sites(None)))
+
+            # Load heatmap data
+            logging.info("Generating heatmap data")
+            heatmap_data_pm25 = uow.sensors.get_heatmap(Series.pm25, start, end)
+            heatmap_data_no2 = uow.sensors.get_heatmap(Series.no2, start, end)
+
+            # Load breach data
+            logging.info("Generating breach data")
+            breach_data_pm25 = uow.sensors.get_breach(Series.pm25, start, end, daily_limits["pm25"]["who"])
+            breach_data_no2 = uow.sensors.get_breach(Series.no2, start, end, daily_limits["no2"]["who"])
+
+            # Load rank data
+            logging.info("Generating rank data")
+            rank_data_pm25 = uow.sensors.get_rank(Series.pm25, start, end)
+            rank_data_no2 = uow.sensors.get_rank(Series.no2, start, end)
+
+            # Now let's mash it all together. The end result is a list of objects, one for each
+            # site, that contains the data for that site. We'll build it up as a dict as that's
+            # a bit easier, and then convert it to a list.
+            logging.info("Reformatting data")
+            data = {site.site_code: {"details": site, "heatmap": {"pm25": [], "no2": []}, "breach": {}, "rank": {}} for site in sites}
+
+            # Append heatmap data
+            for site_code, values in heatmap_data_pm25.items():
+                data[site_code]["heatmap"]["pm25"] = values
+
+            for site_code, values in heatmap_data_no2.items():
+                data[site_code]["heatmap"]["no2"] = values
+
+            # Append breach data
+            for site_code, values in breach_data_pm25.items():
+                data[site_code]["breach"]["pm25"] = values
+
+            for site_code, values in breach_data_no2.items():
+                data[site_code]["breach"]["no2"] = values
+
+            # Append rank data
+            for site_code, values in rank_data_pm25.items():
+                data[site_code]["rank"]["pm25"] = values
+
+            for site_code, values in rank_data_no2.items():
+                data[site_code]["rank"]["no2"] = values
+
+            # Finally convert to a list of WrappedSchema objects and return
+            data_list = [WrappedSchema(details=obj["details"], heatmap=obj["heatmap"], breach=obj["breach"], rank=obj["rank"]) for _, obj in data.items()]
+
+            logging.info("*** Wrapped generation complete")
+
+            return ProcessingResult.SUCCESS_RETRIEVED, data_list
