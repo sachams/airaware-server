@@ -1,5 +1,6 @@
-import random
 from datetime import datetime
+
+import pytest
 
 from server.models import SensorDataModel, SiteModel
 from server.repository.sensor_repository import SensorRepository
@@ -125,43 +126,71 @@ def test_get_bad_data(session, dummy_sites):
     repository.update_sites(dummy_sites)
     session.commit()
 
+    # We need to read the sites back after saving them to get the site_id
+    sites = repository.get_sites(None)
+
     # Add some data - good and bad
     data = [
         SensorDataCreateSchema(
-            site_id=dummy_sites[0].site_id,
+            site_id=sites[0].site_id,
             series=Series.pm25,
             value=1,
             time=datetime(2023, 1, 1, 0, 0, 0, 0),
         ),
         SensorDataCreateSchema(
-            site_id=dummy_sites[0].site_id,
+            site_id=sites[0].site_id,
             series=Series.no2,
             value=2,
             time=datetime(2023, 1, 1, 1, 0, 0, 0),
         ),
         SensorDataCreateSchema(
-            site_id=dummy_sites[0].site_id,
+            site_id=sites[0].site_id,
             series=Series.pm25,
             value=200,
             time=datetime(2023, 1, 1, 2, 0, 0, 0),
         ),
         SensorDataCreateSchema(
-            site_id=dummy_sites[1].site_id,
+            site_id=sites[0].site_id,
             series=Series.pm25,
-            value=1,
+            value=201,
+            time=datetime(2023, 1, 1, 3, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=sites[0].site_id,
+            series=Series.no2,
+            value=202,
+            time=datetime(2023, 1, 1, 4, 0, 0, 0),
+        ),
+        # Site 1
+        SensorDataCreateSchema(
+            site_id=sites[1].site_id,
+            series=Series.pm25,
+            value=11,
             time=datetime(2023, 1, 1, 0, 0, 0, 0),
         ),
         SensorDataCreateSchema(
-            site_id=dummy_sites[1].site_id,
+            site_id=sites[1].site_id,
             series=Series.no2,
-            value=2,
+            value=12,
             time=datetime(2023, 1, 1, 1, 0, 0, 0),
         ),
         SensorDataCreateSchema(
-            site_id=dummy_sites[1].site_id,
+            site_id=sites[1].site_id,
             series=Series.pm25,
-            value=200,
+            value=300,
             time=datetime(2023, 1, 1, 2, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=sites[1].site_id,
+            series=Series.pm25,
+            value=301,
+            time=datetime(2023, 1, 1, 3, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=sites[1].site_id,
+            series=Series.no2,
+            value=302,
+            time=datetime(2023, 1, 1, 4, 0, 0, 0),
         ),
     ]
 
@@ -169,4 +198,20 @@ def test_get_bad_data(session, dummy_sites):
     session.commit()
 
     # Now query for bad data
+    import pdb
+
+    pdb.set_trace()
+
     bad_data = repository.get_bad_data(Series.pm25)
+
+    assert len(bad_data.keys()) == 2
+    assert sites[0].site_code in bad_data.keys()
+    assert sites[1].site_code in bad_data.keys()
+
+    assert len(bad_data[sites[0].site_code]) == 2
+    assert bad_data[sites[0].site_code][0].value == pytest.approx(200)
+    assert bad_data[sites[0].site_code][1].value == pytest.approx(201)
+
+    assert len(bad_data[sites[1].site_code]) == 2
+    assert bad_data[sites[1].site_code][0].value == pytest.approx(300)
+    assert bad_data[sites[1].site_code][1].value == pytest.approx(301)

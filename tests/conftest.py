@@ -32,10 +32,6 @@ def run_migrations():
 def db():
     """Session-wide test database."""
 
-    import pdb
-
-    pdb.set_trace()
-
     if database_exists(SQLALCHEMY_DATABASE_URL):
         drop_database(SQLALCHEMY_DATABASE_URL)
 

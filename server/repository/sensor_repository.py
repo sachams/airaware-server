@@ -342,6 +342,7 @@ class SensorRepository(AbstractSensorRepository):
             .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
             .filter(SensorDataModel.series == series.name)
             .filter(SensorDataModel.value > bad_data_limits[series.name])
+            .filter(SiteModel.is_enabled == True)
         )
 
         data = defaultdict(list)

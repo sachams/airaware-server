@@ -265,9 +265,10 @@ class SensorService:
             return ProcessingResult.SUCCESS_RETRIEVED, data_list
 
     @staticmethod
-    def get_bad_data(uow: AbstractUnitOfWork) -> list[BadDataSchema]:
-        """Generates and returns a dict of summary statistics for the given year"""
+    def get_bad_data(
+        uow: AbstractUnitOfWork, series: Series
+    ) -> dict[str, list[SensorDataSchema]]:
+        """Generates and returns data that has breached a bad data threshold"""
         with uow:
             logging.info("Querying for bad data")
-
-            bad_data = uow.sensors.get_bad_data()
+            return ProcessingResult.SUCCESS_RETRIEVED, uow.sensors.get_bad_data(series)

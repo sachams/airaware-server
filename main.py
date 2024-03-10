@@ -31,7 +31,7 @@ from exception_handlers import (
 )
 from middleware import log_request_middleware
 from server.logging import configure_logging
-from server.schemas import BadDataSchema, SensorDataSchema, SiteAverageSchema
+from server.schemas import SensorDataSchema, SiteAverageSchema
 from server.service import (
     GeometryService,
     ProcessingResult,
@@ -190,7 +190,7 @@ def get_geometry_route(
 @api_router.get("/bad_data/{series}")
 def get_bad_data(
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
-) -> list[BadDataSchema]:
+) -> dict[str, list[SensorDataSchema]]:
     """Returns data that might be questionable. Ie, above a threshold for the specified series"""
     match SensorService.get_bad_data(uow):
         case ProcessingResult.SUCCESS_RETRIEVED, data:
