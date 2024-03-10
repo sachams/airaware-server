@@ -4,6 +4,7 @@ import time
 
 from app_config import daily_limits
 from server.schemas import (
+    BadDataSchema,
     SensorDataCreateSchema,
     SensorDataSchema,
     SiteAverageSchema,
@@ -186,7 +187,7 @@ class SensorService:
         """Generates and returns a dict of summary statistics for the given year"""
         with uow:
             start = datetime.datetime(year, 1, 1)
-            end = datetime.datetime(year+1, 1, 1)
+            end = datetime.datetime(year + 1, 1, 1)
 
             logging.info(f"*** Starting wrapped generation for {year}")
 
@@ -201,8 +202,12 @@ class SensorService:
 
             # Load breach data
             logging.info("Generating breach data")
-            breach_data_pm25 = uow.sensors.get_breach(Series.pm25, start, end, daily_limits["pm25"]["who"])
-            breach_data_no2 = uow.sensors.get_breach(Series.no2, start, end, daily_limits["no2"]["who"])
+            breach_data_pm25 = uow.sensors.get_breach(
+                Series.pm25, start, end, daily_limits["pm25"]["who"]
+            )
+            breach_data_no2 = uow.sensors.get_breach(
+                Series.no2, start, end, daily_limits["no2"]["who"]
+            )
 
             # Load rank data
             logging.info("Generating rank data")
@@ -213,7 +218,15 @@ class SensorService:
             # site, that contains the data for that site. We'll build it up as a dict as that's
             # a bit easier, and then convert it to a list.
             logging.info("Reformatting data")
-            data = {site.site_code: {"details": site, "heatmap": {"pm25": [], "no2": []}, "breach": {}, "rank": {}} for site in sites}
+            data = {
+                site.site_code: {
+                    "details": site,
+                    "heatmap": {"pm25": [], "no2": []},
+                    "breach": {},
+                    "rank": {},
+                }
+                for site in sites
+            }
 
             # Append heatmap data
             for site_code, values in heatmap_data_pm25.items():
@@ -237,8 +250,24 @@ class SensorService:
                 data[site_code]["rank"]["no2"] = values
 
             # Finally convert to a list of WrappedSchema objects and return
-            data_list = [WrappedSchema(details=obj["details"], heatmap=obj["heatmap"], breach=obj["breach"], rank=obj["rank"]) for _, obj in data.items()]
+            data_list = [
+                WrappedSchema(
+                    details=obj["details"],
+                    heatmap=obj["heatmap"],
+                    breach=obj["breach"],
+                    rank=obj["rank"],
+                )
+                for _, obj in data.items()
+            ]
 
             logging.info("*** Wrapped generation complete")
 
             return ProcessingResult.SUCCESS_RETRIEVED, data_list
+
+    @staticmethod
+    def get_bad_data(uow: AbstractUnitOfWork) -> list[BadDataSchema]:
+        """Generates and returns a dict of summary statistics for the given year"""
+        with uow:
+            logging.info("Querying for bad data")
+
+            bad_data = uow.sensors.get_bad_data()

@@ -7,6 +7,7 @@ import redis.asyncio as redis
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from fastapi_cache.decorator import cache
@@ -21,7 +22,7 @@ from exception_handlers import (
 )
 from middleware import log_request_middleware
 from server.logging import configure_logging
-from server.schemas import SensorDataSchema, SiteAverageSchema
+from server.schemas import BadDataSchema, SensorDataSchema, SiteAverageSchema
 from server.service import (
     GeometryService,
     ProcessingResult,
@@ -37,6 +38,8 @@ configure_logging()
 
 app = FastAPI()
 api_router = APIRouter()
+
+api_key_header = APIKeyHeader(name="X-API-Key")
 
 origins = [
     "https://airaware.static.observableusercontent.com",
@@ -65,6 +68,15 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 
+def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
+    if api_key_header in app_config.api_keys:
+        return api_key_header
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing API Key",
+    )
+
+
 def request_key_builder(
     func,
     namespace: str = "",
@@ -73,12 +85,14 @@ def request_key_builder(
     *args,
     **kwargs,
 ):
-    return ":".join([
-        namespace,
-        request.method.lower(),
-        request.url.path,
-        repr(sorted(request.query_params.items()))
-    ])
+    return ":".join(
+        [
+            namespace,
+            request.method.lower(),
+            request.url.path,
+            repr(sorted(request.query_params.items())),
+        ]
+    )
 
 
 # Initialise redis
@@ -103,7 +117,7 @@ def log_request_info(
 
 
 @api_router.get("/sensor/{series}/{start}/{end}/{frequency}")
-@cache(expire=60*60*24, key_builder=request_key_builder)  # 1 day
+@cache(expire=60 * 60 * 24, key_builder=request_key_builder)  # 1 day
 def get_sensor_data_route(
     series: Series,
     start: datetime.datetime,
@@ -122,7 +136,7 @@ def get_sensor_data_route(
 
 
 @api_router.get("/site_average/{series}/{start}/{end}")
-@cache(expire=60*60*24, key_builder=request_key_builder)  # 1 day
+@cache(expire=60 * 60 * 24, key_builder=request_key_builder)  # 1 day
 def get_site_average_route(
     series: Series,
     start: datetime.datetime,
@@ -138,9 +152,9 @@ def get_site_average_route(
 @api_router.get("/sites")
 # Cache for 6h. A bit shorter than 1 day as this URL doesn't have a date in it and handy to make
 # sure it is refreshed a bit more often
-@cache(expire=60*60*6, key_builder=request_key_builder)
+@cache(expire=60 * 60 * 6, key_builder=request_key_builder)
 def get_sites_route(uow: AbstractUnitOfWork = Depends(get_unit_of_work)):
-    """Returns the list of all sites from known data sources"""    
+    """Returns the list of all sites from known data sources"""
     match SensorService.get_sites(uow, None):
         case ProcessingResult.SUCCESS_RETRIEVED, sites:
             return sites
@@ -162,6 +176,16 @@ def get_geometry_route(
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND, detail=f"Unknown geometry {name}"
             )
+
+
+@api_router.get("/bad_data/{series}")
+def get_bad_data(
+    uow: AbstractUnitOfWork = Depends(get_unit_of_work),
+) -> list[BadDataSchema]:
+    """Returns data that might be questionable. Ie, above a threshold for the specified series"""
+    match SensorService.get_bad_data(uow):
+        case ProcessingResult.SUCCESS_RETRIEVED, data:
+            return data
 
 
 @api_router.get("/healthcheck")

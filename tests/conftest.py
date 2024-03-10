@@ -2,10 +2,11 @@ import os
 from unittest import mock
 
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
 from main import app, get_unit_of_work
-from server.database import SessionLocal
+from server.database import SessionLocal, engine
 from server.repository.fake_geometry_repository import FakeGeometryRepository
 from server.repository.fake_request_repository import FakeRequestRepository
 from server.repository.fake_sensor_repository import FakeSensorRepository
@@ -14,7 +15,27 @@ from server.unit_of_work.fake_unit_of_work import FakeUnitOfWork
 
 @pytest.fixture()
 def session():
-    return SessionLocal()
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = SessionLocal(bind=connection)
+
+    # Begin a nested transaction (using SAVEPOINT).
+    nested = connection.begin_nested()
+
+    # If the application code calls session.commit, it will end the nested
+    # transaction. Need to start a new one when that happens.
+    @sa.event.listens_for(session, "after_transaction_end")
+    def end_savepoint(session, transaction):
+        nonlocal nested
+        if not nested.is_active:
+            nested = connection.begin_nested()
+
+    yield session
+
+    # Rollback the overall transaction, restoring the state before the test ran.
+    session.close()
+    transaction.rollback()
+    connection.close()
 
 
 @pytest.fixture()

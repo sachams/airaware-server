@@ -34,10 +34,16 @@ def _test_add_data(session):
     for day in range(1, 3):
         for hour in range(0, 5):
             data_1 = SensorDataModel(
-                site_id=site_1.site_id, series=Series.pm25, value=day * hour, time=datetime.datetime(2023, 1, day, hour, 0,0,0)
+                site_id=site_1.site_id,
+                series=Series.pm25,
+                value=day * hour,
+                time=datetime.datetime(2023, 1, day, hour, 0, 0, 0),
             )
             data_2 = SensorDataModel(
-                site_id=site_2.site_id, series=Series.pm25, value=day * hour * 1.5, time=datetime.datetime(2023, 1, day, hour, 0,0,0)
+                site_id=site_2.site_id,
+                series=Series.pm25,
+                value=day * hour * 1.5,
+                time=datetime.datetime(2023, 1, day, hour, 0, 0, 0),
             )
             session.add_all([data_1, data_2])
 
@@ -105,6 +111,7 @@ def test_get_breach(session):
         Series.no2, datetime.datetime(2023, 1, 1), datetime.datetime(2024, 1, 1), 5
     )
 
+
 def test_get_rank(session):
     repository = SensorRepository(session)
 
@@ -112,3 +119,6 @@ def test_get_rank(session):
         Series.pm25, datetime.datetime(2023, 1, 1), datetime.datetime(2024, 1, 1)
     )
 
+
+def test_get_bad_data(session):
+    repository = SensorRepository(session)
