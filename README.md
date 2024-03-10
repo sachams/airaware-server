@@ -7,7 +7,11 @@ The AirAware server is a FastAPI-based web server that stores air quality data i
 ### Export to requirements.txt
 
 ```sh
-poetry export --without-hashes -f requirements.txt --output requirements.txt
+poetry export --without dev --without-hashes -f requirements.txt --output requirements.txt
+```
+
+```sh
+poetry export --only dev --without-hashes -f requirements.txt --output dev_requirements.txt
 ```
 
 ### Start a fly database proxy

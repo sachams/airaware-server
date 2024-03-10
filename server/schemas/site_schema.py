@@ -16,12 +16,12 @@ class SiteBaseSchema(BaseModel):
     source: Source
 
     # Optional fields
-    is_enabled: bool | None
-    photo_url: str | None
-    description: str | None
-    start_date: datetime.datetime | None
-    end_date: datetime.datetime | None
-    borough: str | None
+    is_enabled: bool | None = None
+    photo_url: str | None = None
+    description: str | None = None
+    start_date: datetime.datetime | None = None
+    end_date: datetime.datetime | None = None
+    borough: str | None = None
 
 
 class SiteCreateSchema(SiteBaseSchema):

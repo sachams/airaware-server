@@ -36,7 +36,7 @@ services:
     environment:
       DATABASE_USERNAME: postgres
       DATABASE_PASSWORD: postgres
-      DATABASE_NAME: breathe_air
+      DATABASE_NAME: breathe_air_test
       DATABASE_HOST: database
       REDIS_HOST: redis
     depends_on:

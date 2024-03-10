@@ -1,8 +1,9 @@
-import datetime
 import random
+from datetime import datetime
 
 from server.models import SensorDataModel, SiteModel
 from server.repository.sensor_repository import SensorRepository
+from server.schemas import SensorDataCreateSchema
 from server.types import Classification, Series, SiteStatus, Source
 
 
@@ -37,13 +38,13 @@ def _test_add_data(session):
                 site_id=site_1.site_id,
                 series=Series.pm25,
                 value=day * hour,
-                time=datetime.datetime(2023, 1, day, hour, 0, 0, 0),
+                time=datetime(2023, 1, day, hour, 0, 0, 0),
             )
             data_2 = SensorDataModel(
                 site_id=site_2.site_id,
                 series=Series.pm25,
                 value=day * hour * 1.5,
-                time=datetime.datetime(2023, 1, day, hour, 0, 0, 0),
+                time=datetime(2023, 1, day, hour, 0, 0, 0),
             )
             session.add_all([data_1, data_2])
 
@@ -54,7 +55,7 @@ def test_get_site_average(session):
 
     repository = SensorRepository(session)
     data = repository.get_site_average(
-        Series.pm25, datetime.datetime(2022, 1, 1), datetime.datetime(2023, 1, 1)
+        Series.pm25, datetime(2022, 1, 1), datetime(2023, 1, 1)
     )
 
 
@@ -100,7 +101,7 @@ def test_get_heatmap(session):
 
     repository = SensorRepository(session)
     data = repository.get_heatmap(
-        Series.pm25, datetime.datetime(2023, 1, 1), datetime.datetime(2024, 1, 1)
+        Series.pm25, datetime(2023, 1, 1), datetime(2024, 1, 1)
     )
 
 
@@ -108,17 +109,64 @@ def test_get_breach(session):
     repository = SensorRepository(session)
 
     data = repository.get_breach(
-        Series.no2, datetime.datetime(2023, 1, 1), datetime.datetime(2024, 1, 1), 5
+        Series.no2, datetime(2023, 1, 1), datetime(2024, 1, 1), 5
     )
 
 
 def test_get_rank(session):
     repository = SensorRepository(session)
 
-    data = repository.get_rank(
-        Series.pm25, datetime.datetime(2023, 1, 1), datetime.datetime(2024, 1, 1)
-    )
+    data = repository.get_rank(Series.pm25, datetime(2023, 1, 1), datetime(2024, 1, 1))
 
 
-def test_get_bad_data(session):
+def test_get_bad_data(session, dummy_sites):
     repository = SensorRepository(session)
+    # Add some data
+    repository.update_sites(dummy_sites)
+    session.commit()
+
+    # Add some data - good and bad
+    data = [
+        SensorDataCreateSchema(
+            site_id=dummy_sites[0].site_id,
+            series=Series.pm25,
+            value=1,
+            time=datetime(2023, 1, 1, 0, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=dummy_sites[0].site_id,
+            series=Series.no2,
+            value=2,
+            time=datetime(2023, 1, 1, 1, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=dummy_sites[0].site_id,
+            series=Series.pm25,
+            value=200,
+            time=datetime(2023, 1, 1, 2, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=dummy_sites[1].site_id,
+            series=Series.pm25,
+            value=1,
+            time=datetime(2023, 1, 1, 0, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=dummy_sites[1].site_id,
+            series=Series.no2,
+            value=2,
+            time=datetime(2023, 1, 1, 1, 0, 0, 0),
+        ),
+        SensorDataCreateSchema(
+            site_id=dummy_sites[1].site_id,
+            series=Series.pm25,
+            value=200,
+            time=datetime(2023, 1, 1, 2, 0, 0, 0),
+        ),
+    ]
+
+    repository.write_data(data)
+    session.commit()
+
+    # Now query for bad data
+    bad_data = repository.get_bad_data(Series.pm25)
