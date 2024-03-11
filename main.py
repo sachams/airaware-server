@@ -150,10 +150,11 @@ def get_site_average_route(
     series: Series,
     start: datetime.datetime,
     end: datetime.datetime,
+    enrich: bool = False,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
 ) -> list[SiteAverageSchema]:
     """Returns the list of all sites with the average levels for the periods given"""
-    match SensorService.get_site_average(uow, series, start, end):
+    match SensorService.get_site_average(uow, series, start, end, enrich):
         case ProcessingResult.SUCCESS_RETRIEVED, items:
             return items
 

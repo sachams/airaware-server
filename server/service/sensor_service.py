@@ -38,10 +38,18 @@ class SensorService:
         series: Series,
         start: datetime.datetime,
         end: datetime.datetime,
+        enrich: bool = False,
     ) -> list[SiteAverageSchema]:
         with uow:
-            items = uow.sensors.get_site_average(series, start, end)
-            return ProcessingResult.SUCCESS_RETRIEVED, items
+            averages = uow.sensors.get_site_average(series, start, end)
+            if enrich:
+                # Enrich the data with site details
+                sites = uow.sensors.get_sites(None)
+                site_map = {site.site_code: site for site in sites}
+                for average in averages:
+                    average.site_details = site_map.get(average.site_code)
+
+            return ProcessingResult.SUCCESS_RETRIEVED, averages
 
     @staticmethod
     def get_sites(uow: AbstractUnitOfWork, source: Source | None) -> list[SiteSchema]:
