@@ -17,3 +17,4 @@ database_host = os.environ["DATABASE_HOST"]
 redis_url = f"redis://{os.environ['REDIS_HOST']}:6379"
 
 daily_limits = {"pm25": {"who": 15}, "no2": {"who": 25}}
+api_keys = os.environ["API_KEYS"].split(",")
