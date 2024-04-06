@@ -352,3 +352,13 @@ class SensorRepository(AbstractSensorRepository):
             data[row.site_code].append(SensorDataSchema(time=row.time, value=row.value))
 
         return data
+
+    def update_node_data_status() -> None:
+        """Sets (and clears) the is_data_ok flag for nodes, depending on whether any data point is above
+        threshold, or if all data points are below threshold"""
+        with uow:
+            logging.info("Updating node data status")
+            return (
+                ProcessingResult.SUCCESS_RETRIEVED,
+                uow.sensors.update_node_data_status(),
+            )

@@ -215,3 +215,6 @@ def test_get_bad_data(session, dummy_sites):
     assert len(bad_data[sites[1].site_code]) == 2
     assert bad_data[sites[1].site_code][0].value == pytest.approx(300)
     assert bad_data[sites[1].site_code][1].value == pytest.approx(301)
+
+
+# TODO: Add update node data status

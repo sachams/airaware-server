@@ -47,8 +47,8 @@ def sync_all(resync, start):
 @cli.command()
 @click.argument("series", required=True, type=click.Choice(Series))
 @click.option("--filename", required=False, default="bad_data.csv")
-def bad_data(series, filename):
-    """Synchronises all data between remote sources and our datastore"""
+def get_bad_data(series, filename):
+    """Lists all bad data - ie, data above a threshold"""
     uow = UnitOfWork()
     result, bad_data = SensorService.get_bad_data(uow, series)
 
@@ -66,6 +66,16 @@ def bad_data(series, filename):
                 dest_file.write(
                     f"{site_code},{series.name},{row.time.strftime('%d/%m/%Y %H:%M')},{row.value}\n"
                 )
+
+
+# TODO: test this
+@cli.command()
+def update_node_data_status():
+    """Updates the is_data_ok status for each node based on whether there are any points that are
+    above threshold. If there is no bad data, the is_data_ok flag gets set to True. Note that
+    this is independent to the is_enabled flag."""
+    uow = UnitOfWork()
+    SensorService.update_node_data_status(uow)
 
 
 @cli.command()

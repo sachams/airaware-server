@@ -44,3 +44,23 @@ fly postgres create --image-ref flyio/postgres:14.4
 
 ```sh
 ```
+
+## Useful queries
+
+### Annual averages (eg, NO2)
+
+```sql
+with main as (SELECT site.site_code, avg(sensor_data.value) AS mean
+FROM sensor_data 
+JOIN site ON site.site_id = sensor_data.site_id
+WHERE sensor_data.series = 'no2'
+AND sensor_data.time >= '2023-01-01 00:00:00'
+AND sensor_data.time < '2024-01-01 00:00:00'
+GROUP BY site.site_code 
+ORDER BY site.site_code)
+
+select main.site_code, site.name, site.latitude, site.longitude, site.borough, main.mean
+from main 
+join site on main.site_code = site.site_code
+where site.is_enabled='TRUE';
+```

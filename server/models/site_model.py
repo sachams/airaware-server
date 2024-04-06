@@ -19,6 +19,7 @@ class SiteModel(Base):
     longitude: Mapped[float]
     site_type: Mapped[Classification]
     source: Mapped[Source]
+    is_data_ok: Mapped[bool] = mapped_column(default=True)
 
     # Optional fields
     is_enabled: Mapped[bool | None]
