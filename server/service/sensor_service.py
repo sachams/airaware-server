@@ -8,6 +8,7 @@ from server.schemas import (
     SensorDataSchema,
     SiteAverageSchema,
     SiteSchema,
+    SyncSiteSchema,
     WrappedSchema,
 )
 from server.service.processing_result import ProcessingResult
@@ -68,6 +69,31 @@ class SensorService:
                 uow.commit()
 
             return ProcessingResult.SUCCESS_RETRIEVED, None
+
+    @staticmethod
+    def resync_data(
+        uow: AbstractUnitOfWork, data: SyncSiteSchema
+    ) -> tuple[ProcessingResult, str | None]:
+        """Reads site information from all sources and inserts/updates records in the repository.
+        Note that the site_code field is used as the unique identifier for updates."""
+        try:
+            with uow:
+                site = uow.sensors.get_site(data.site_code)
+
+            if site is None:
+                logging.error(f"Unable to find site {data.site_code}")
+                return (
+                    ProcessingResult.ERROR_NOT_FOUND,
+                    f"Unable to find site {data.site_code}",
+                )
+
+            SensorService.sync_single_site_data(
+                uow, data.site_code, None, site.source, data.series, True
+            )
+            return ProcessingResult.SUCCESS_UPDATED, None
+        except Exception as e:
+            logging.exception(f"Caught exception while resyncing data: {e}")
+            return ProcessingResult.ERROR_INTERNAL_SERVER_ERROR, e
 
     @staticmethod
     def sync_single_site_data(
@@ -186,7 +212,7 @@ class SensorService:
         """Generates and returns a dict of summary statistics for the given year"""
         with uow:
             start = datetime.datetime(year, 1, 1)
-            end = datetime.datetime(year+1, 1, 1)
+            end = datetime.datetime(year + 1, 1, 1)
 
             logging.info(f"*** Starting wrapped generation for {year}")
 
@@ -201,8 +227,12 @@ class SensorService:
 
             # Load breach data
             logging.info("Generating breach data")
-            breach_data_pm25 = uow.sensors.get_breach(Series.pm25, start, end, daily_limits["pm25"]["who"])
-            breach_data_no2 = uow.sensors.get_breach(Series.no2, start, end, daily_limits["no2"]["who"])
+            breach_data_pm25 = uow.sensors.get_breach(
+                Series.pm25, start, end, daily_limits["pm25"]["who"]
+            )
+            breach_data_no2 = uow.sensors.get_breach(
+                Series.no2, start, end, daily_limits["no2"]["who"]
+            )
 
             # Load rank data
             logging.info("Generating rank data")
@@ -213,7 +243,15 @@ class SensorService:
             # site, that contains the data for that site. We'll build it up as a dict as that's
             # a bit easier, and then convert it to a list.
             logging.info("Reformatting data")
-            data = {site.site_code: {"details": site, "heatmap": {"pm25": [], "no2": []}, "breach": {}, "rank": {}} for site in sites}
+            data = {
+                site.site_code: {
+                    "details": site,
+                    "heatmap": {"pm25": [], "no2": []},
+                    "breach": {},
+                    "rank": {},
+                }
+                for site in sites
+            }
 
             # Append heatmap data
             for site_code, values in heatmap_data_pm25.items():
@@ -237,7 +275,15 @@ class SensorService:
                 data[site_code]["rank"]["no2"] = values
 
             # Finally convert to a list of WrappedSchema objects and return
-            data_list = [WrappedSchema(details=obj["details"], heatmap=obj["heatmap"], breach=obj["breach"], rank=obj["rank"]) for _, obj in data.items()]
+            data_list = [
+                WrappedSchema(
+                    details=obj["details"],
+                    heatmap=obj["heatmap"],
+                    breach=obj["breach"],
+                    rank=obj["rank"],
+                )
+                for _, obj in data.items()
+            ]
 
             logging.info("*** Wrapped generation complete")
 
