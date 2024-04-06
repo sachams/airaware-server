@@ -40,3 +40,11 @@ fly postgres create --image-ref flyio/postgres:14.4
 
 ```sh
 ```
+
+## Compressing GeoJSON
+
+Use the [GeoJSON Minify tool](https://open-innovations.github.io/geojson-minify/)
+
+## Converting shapefile to geojson
+
+https://mygeodata.cloud/converter/shp-to-geojson
