@@ -11,6 +11,7 @@ from server.schemas.sensor_data_schema import (
 )
 from server.schemas.site_average_schema import SiteAverageSchema
 from server.schemas.site_schema import SiteCreateSchema, SiteSchema
+from server.schemas.sync_site_schema import SyncSiteSchema
 from server.schemas.wrapped_schema import WrappedSchema
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "SiteAverageSchema",
     "SiteCreateSchema",
     "SiteSchema",
+    "SyncSiteSchema",
     "WrappedSchema",
 ]

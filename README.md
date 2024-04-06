@@ -64,3 +64,10 @@ from main
 join site on main.site_code = site.site_code
 where site.is_enabled='TRUE';
 ```
+## Compressing GeoJSON
+
+Use the [GeoJSON Minify tool](https://open-innovations.github.io/geojson-minify/)
+
+## Converting shapefile to geojson
+
+https://mygeodata.cloud/converter/shp-to-geojson

@@ -9,6 +9,7 @@ from server.schemas import (
     SensorDataSchema,
     SiteAverageSchema,
     SiteSchema,
+    SyncSiteSchema,
     WrappedSchema,
 )
 from server.service.processing_result import ProcessingResult
@@ -77,6 +78,31 @@ class SensorService:
                 uow.commit()
 
             return ProcessingResult.SUCCESS_RETRIEVED, None
+
+    @staticmethod
+    def resync_data(
+        uow: AbstractUnitOfWork, data: SyncSiteSchema
+    ) -> tuple[ProcessingResult, str | None]:
+        """Reads site information from all sources and inserts/updates records in the repository.
+        Note that the site_code field is used as the unique identifier for updates."""
+        try:
+            with uow:
+                site = uow.sensors.get_site(data.site_code)
+
+            if site is None:
+                logging.error(f"Unable to find site {data.site_code}")
+                return (
+                    ProcessingResult.ERROR_NOT_FOUND,
+                    f"Unable to find site {data.site_code}",
+                )
+
+            SensorService.sync_single_site_data(
+                uow, data.site_code, None, site.source, data.series, True
+            )
+            return ProcessingResult.SUCCESS_UPDATED, None
+        except Exception as e:
+            logging.exception(f"Caught exception while resyncing data: {e}")
+            return ProcessingResult.ERROR_INTERNAL_SERVER_ERROR, e
 
     @staticmethod
     def sync_single_site_data(
