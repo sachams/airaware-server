@@ -15,7 +15,6 @@ from server.schemas.wrapped_schema import WrappedSchema
 
 __all__ = [
     "BreachSchema",
-    "DataQualitySchema",
     "HeatmapSchema",
     "RangeSchema",
     "RankSchema",
