@@ -191,12 +191,12 @@ def get_geometry_route(
             )
 
 
-@api_router.get("/bad_data/{series}")
-def get_bad_data(
+@api_router.get("/outlier/{series}")
+def get_outliers(
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
 ) -> dict[str, list[SensorDataSchema]]:
     """Returns data that might be questionable. Ie, above a threshold for the specified series"""
-    match SensorService.get_bad_data(uow):
+    match SensorService.get_outliers_in_context(uow):
         case ProcessingResult.SUCCESS_RETRIEVED, data:
             return data
 

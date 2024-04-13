@@ -40,10 +40,6 @@ def test_get_site_average(client, snapshot):
 
 @pytest.mark.usefixtures("use_fake_uow")
 def test_get_site_average_enriched(client, snapshot):
-    import pdb
-
-    pdb.set_trace()
-
     response = client.get(
         "/site_average/pm25/2022-01-01T10:00:00/2022-02-01T10:00:00?enrich=true"
     )

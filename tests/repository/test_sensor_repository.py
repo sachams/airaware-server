@@ -120,7 +120,7 @@ def test_get_rank(session):
     data = repository.get_rank(Series.pm25, datetime(2023, 1, 1), datetime(2024, 1, 1))
 
 
-def test_get_bad_data(session, dummy_sites):
+def test_get_outliers(session, dummy_sites):
     repository = SensorRepository(session)
     # Add some data
     repository.update_sites(dummy_sites)
@@ -202,19 +202,16 @@ def test_get_bad_data(session, dummy_sites):
 
     pdb.set_trace()
 
-    bad_data = repository.get_bad_data(Series.pm25)
+    outliers = repository.get_outliers(Series.pm25)
 
-    assert len(bad_data.keys()) == 2
-    assert sites[0].site_code in bad_data.keys()
-    assert sites[1].site_code in bad_data.keys()
+    assert len(outliers.keys()) == 2
+    assert sites[0].site_code in outliers.keys()
+    assert sites[1].site_code in outliers.keys()
 
-    assert len(bad_data[sites[0].site_code]) == 2
-    assert bad_data[sites[0].site_code][0].value == pytest.approx(200)
-    assert bad_data[sites[0].site_code][1].value == pytest.approx(201)
+    assert len(outliers[sites[0].site_code]) == 2
+    assert outliers[sites[0].site_code][0].value == pytest.approx(200)
+    assert outliers[sites[0].site_code][1].value == pytest.approx(201)
 
-    assert len(bad_data[sites[1].site_code]) == 2
-    assert bad_data[sites[1].site_code][0].value == pytest.approx(300)
-    assert bad_data[sites[1].site_code][1].value == pytest.approx(301)
-
-
-# TODO: Add update node data status
+    assert len(outliers[sites[1].site_code]) == 2
+    assert outliers[sites[1].site_code][0].value == pytest.approx(300)
+    assert outliers[sites[1].site_code][1].value == pytest.approx(301)

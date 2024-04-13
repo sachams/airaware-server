@@ -15,7 +15,10 @@ from server.types import Classification, Frequency, Series, SiteStatus, Source
 
 class FakeSensorRepository(AbstractSensorRepository):
     def __init__(self):
-        self.data = []
+        self.data = [
+            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
+            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
+        ]
 
     def write_data(self, data: list[SensorDataCreateSchema]) -> None:
         self.data = data
@@ -29,10 +32,7 @@ class FakeSensorRepository(AbstractSensorRepository):
         codes: list[str],
         types: list[Classification],
     ) -> list[SensorDataSchema]:
-        return [
-            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
-            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
-        ]
+        return self.data
 
     def delete_data(self, series: Series, site_id: int) -> None:
         raise NotImplementedError

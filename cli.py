@@ -46,11 +46,11 @@ def sync_all(resync, start):
 
 @cli.command()
 @click.argument("series", required=True, type=click.Choice(Series))
-@click.option("--filename", required=False, default="bad_data.csv")
-def get_bad_data(series, filename):
-    """Lists all bad data - ie, data above a threshold"""
+@click.option("--filename", required=False, default="outlier_data.csv")
+def get_outliers(series, filename):
+    """Lists all outlier data"""
     uow = UnitOfWork()
-    result, bad_data = SensorService.get_bad_data(uow, series)
+    result, outliers = SensorService.get_outliers(uow, series)
 
     # Display a summary of the bad data
     # for site_code, data in bad_data.items():
@@ -61,21 +61,11 @@ def get_bad_data(series, filename):
     # And dump it out to a CSV file
     print(f"Writing to {series}_{filename}")
     with open(f"{series}_{filename}", "w") as dest_file:
-        for site_code, data in bad_data.items():
+        for site_code, data in outliers.items():
             for row in data:
                 dest_file.write(
                     f"{site_code},{series.name},{row.time.strftime('%d/%m/%Y %H:%M')},{row.value}\n"
                 )
-
-
-# TODO: test this
-@cli.command()
-def update_node_data_status():
-    """Updates the is_data_ok status for each node based on whether there are any points that are
-    above threshold. If there is no bad data, the is_data_ok flag gets set to True. Note that
-    this is independent to the is_enabled flag."""
-    uow = UnitOfWork()
-    SensorService.update_node_data_status(uow)
 
 
 @cli.command()

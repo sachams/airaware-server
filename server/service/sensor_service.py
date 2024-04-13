@@ -1,10 +1,11 @@
 import datetime
 import logging
 import time
+from collections import defaultdict
 
 from app_config import daily_limits
 from server.schemas import (
-    BadDataSchema,
+    RangeSchema,
     SensorDataCreateSchema,
     SensorDataSchema,
     SiteAverageSchema,
@@ -299,21 +300,57 @@ class SensorService:
             return ProcessingResult.SUCCESS_RETRIEVED, data_list
 
     @staticmethod
-    def get_bad_data(
+    def get_outliers_in_context(
         uow: AbstractUnitOfWork, series: Series
-    ) -> dict[str, list[SensorDataSchema]]:
-        """Generates and returns data that has breached a bad data threshold"""
+    ) -> dict[str, tuple[list[SensorDataSchema], list[SensorDataSchema]]]:
+        """Generates and returns data that are considered outliers, along with
+        context (all data points for +/- 1 day)"""
         with uow:
-            logging.info("Querying for bad data")
-            return ProcessingResult.SUCCESS_RETRIEVED, uow.sensors.get_bad_data(series)
+            logging.info("Querying for outlier data")
+            outliers = uow.sensors.get_outliers(series)
+
+            logging.info("Calculating block ranges")
+            block_ranges = SensorService.get_block_ranges(outliers)
+
+            logging.info("Adding context")
+            outliers_in_context = {}
+            for site_code, range in block_ranges.items():
+                logging.info(f"Querying context data for {site_code}")
+                context_data = uow.sensors.get_data(
+                    series, range.start, range.end, Frequency.hour, [site_code]
+                )
+                outliers_in_context[site_code] = {
+                    "outliers": outliers[site_code],
+                    "context": context_data,
+                }
+
+            return ProcessingResult.SUCCESS_RETRIEVED, outliers_in_context
 
     @staticmethod
-    def update_node_data_status(uow: AbstractUnitOfWork) -> None:
-        """Sets (and clears) the is_data_ok flag for nodes, depending on whether any data point is above
-        threshold, or if all data points are below threshold"""
-        with uow:
-            logging.info("Updating node data status")
-            return (
-                ProcessingResult.SUCCESS_RETRIEVED,
-                uow.sensors.update_node_data_status(),
-            )
+    def get_block_ranges(
+        outliers: dict[str, list[SensorDataSchema]]
+    ) -> dict[str, list[RangeSchema]]:
+        """Calculates date blocks from the outlier data. An outlier range is defined as any
+        series of outlier points that are no more than a day apart."""
+        block_ranges = defaultdict(list)
+
+        for site_code, data in outliers.items():
+            start = data[0].time
+            for index, row in enumerate(data):
+                # Grab the next row, if we can
+                next_row = data[index + 1] if index < len(data) - 1 else None
+
+                if next_row:
+                    if next_row.time - row.time > datetime.timedelta(days=1):
+                        # The next row is more than a day away - close out this block
+                        block_ranges[site_code].append(
+                            RangeSchema(start=start, end=row.time)
+                        )
+                        start = next_row.time
+                else:
+                    # No more next row - close out the block
+                    block_ranges[site_code].append(
+                        RangeSchema(start=start, end=row.time)
+                    )
+
+        return block_ranges

@@ -7,11 +7,10 @@ from pydantic import TypeAdapter
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
-from app_config import bad_data_limits
+from app_config import outlier_threshold
 from server.models import SensorDataModel, SiteModel
 from server.repository.abstract_sensor_repository import AbstractSensorRepository
 from server.schemas import (
-    BadDataSchema,
     BreachSchema,
     HeatmapSchema,
     RankSchema,
@@ -335,13 +334,13 @@ class SensorRepository(AbstractSensorRepository):
 
         return data
 
-    def get_bad_data(self, series: Series) -> dict[str, list[SensorDataSchema]]:
-        """Returns arrays of bad data for the specified series"""
+    def get_outliers(self, series: Series) -> dict[str, list[SensorDataSchema]]:
+        """Returns arrays of outlier data for the specified series"""
         query = (
             select(SiteModel.site_code, SensorDataModel.value, SensorDataModel.time)
             .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
             .filter(SensorDataModel.series == series.name)
-            .filter(SensorDataModel.value > bad_data_limits[series.name])
+            .filter(SensorDataModel.value > outlier_threshold[series.name])
             .filter(SiteModel.is_enabled == True)
         )
 
@@ -352,13 +351,3 @@ class SensorRepository(AbstractSensorRepository):
             data[row.site_code].append(SensorDataSchema(time=row.time, value=row.value))
 
         return data
-
-    def update_node_data_status() -> None:
-        """Sets (and clears) the is_data_ok flag for nodes, depending on whether any data point is above
-        threshold, or if all data points are below threshold"""
-        with uow:
-            logging.info("Updating node data status")
-            return (
-                ProcessingResult.SUCCESS_RETRIEVED,
-                uow.sensors.update_node_data_status(),
-            )
