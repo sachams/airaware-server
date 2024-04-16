@@ -40,8 +40,8 @@ class SensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
         frequency: Frequency,
-        codes: list[str] | None,
-        types: list[Classification] | None,
+        codes: list[str] | None = None,
+        types: list[Classification] | None = None,
     ) -> list[SensorDataSchema]:
         """Reads data from the datastore, averaging across the specified sites. If no
         sites are specified, it averages across all sites.
@@ -334,7 +334,9 @@ class SensorRepository(AbstractSensorRepository):
 
         return data
 
-    def get_outliers(self, series: Series) -> dict[str, list[SensorDataSchema]]:
+    def get_outliers_threshold(
+        self, series: Series
+    ) -> dict[str, list[SensorDataSchema]]:
         """Returns arrays of outlier data for the specified series"""
         query = (
             select(SiteModel.site_code, SensorDataModel.value, SensorDataModel.time)

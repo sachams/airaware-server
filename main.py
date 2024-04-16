@@ -34,7 +34,12 @@ from exception_handlers import (
 )
 from middleware import log_request_middleware
 from server.logging import configure_logging
-from server.schemas import SensorDataSchema, SiteAverageSchema, SyncSiteSchema
+from server.schemas import (
+    OutlierBlockSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SyncSiteSchema,
+)
 from server.service import (
     GeometryService,
     ProcessingResult,
@@ -191,12 +196,13 @@ def get_geometry_route(
             )
 
 
-@api_router.get("/outlier/{series}")
+@api_router.get("/outlier/{series}", status_code=status.HTTP_200_OK)
 def get_outliers(
+    series: Series,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
-) -> dict[str, list[SensorDataSchema]]:
+) -> dict[str, list[OutlierBlockSchema]]:
     """Returns data that might be questionable. Ie, above a threshold for the specified series"""
-    match SensorService.get_outliers_in_context(uow):
+    match SensorService.get_outliers_in_context(uow, series):
         case ProcessingResult.SUCCESS_RETRIEVED, data:
             return data
 

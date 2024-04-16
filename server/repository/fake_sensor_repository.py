@@ -29,8 +29,8 @@ class FakeSensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
         frequency: Frequency,
-        codes: list[str],
-        types: list[Classification],
+        codes: list[str] | None = None,
+        types: list[Classification] | None = None,
     ) -> list[SensorDataSchema]:
         return self.data
 
@@ -170,4 +170,38 @@ class FakeSensorRepository(AbstractSensorRepository):
         return {
             "CLDP0001": RankSchema(rank=1, value=3.0),
             "CLDP0002": RankSchema(rank=2, value=4.5),
+        }
+
+    def get_outliers_threshold(
+        self, series: Series
+    ) -> dict[str, list[SensorDataSchema]]:
+        return {
+            "CLDP0001": [
+                # Block 1
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 2, 0, 0)),
+                # Block 2
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 2, 0, 0)),
+                # Block 3
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 5, 0, 0, 0)),
+                # Block 4
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 7, 0, 0, 0)),
+            ],
+            "CLDP0002": [
+                # Block 1
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 2, 0, 0)),
+                # Block 2
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 2, 0, 0)),
+                # Block 3
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 5, 0, 0, 0)),
+                # Block 4
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 7, 0, 0, 0)),
+            ],
         }

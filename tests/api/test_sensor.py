@@ -71,4 +71,9 @@ def test_get_site_average_db_exception(client, mocker, sensor_repository):
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-# TODO: Add update node data status test
+@pytest.mark.usefixtures("use_fake_uow")
+def test_get_outliers(client, snapshot):
+    response = client.get("/outlier/pm25")
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == snapshot

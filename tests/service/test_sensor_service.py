@@ -58,8 +58,42 @@ def test_generate_wrapped(fake_uow, sensor_repository):
 
 def test_get_block_ranges():
     # Create some test ranges
+    outliers = [
+        # Block 1
+        SensorDataSchema(value=0, time=datetime(2022, 1, 1, 0, 0, 0)),
+        SensorDataSchema(value=0, time=datetime(2022, 1, 1, 1, 0, 0)),
+        SensorDataSchema(value=0, time=datetime(2022, 1, 1, 2, 0, 0)),
+        # Block 2
+        SensorDataSchema(value=0, time=datetime(2022, 1, 3, 0, 0, 0)),
+        SensorDataSchema(value=0, time=datetime(2022, 1, 3, 1, 0, 0)),
+        SensorDataSchema(value=0, time=datetime(2022, 1, 3, 2, 0, 0)),
+        # Block 3
+        SensorDataSchema(value=0, time=datetime(2022, 1, 5, 0, 0, 0)),
+        # Block 4
+        SensorDataSchema(value=0, time=datetime(2022, 1, 7, 0, 0, 0)),
+    ]
+
+    # And assert that they got identified correctly
+    blocks = SensorService.get_block_ranges(outliers)
+    assert len(blocks) == 4
+
+    assert blocks[0] == RangeSchema(
+        start=datetime(2022, 1, 1, 0, 0, 0), end=datetime(2022, 1, 1, 2, 0, 0)
+    )
+    assert blocks[1] == RangeSchema(
+        start=datetime(2022, 1, 3, 0, 0, 0), end=datetime(2022, 1, 3, 2, 0, 0)
+    )
+    assert blocks[2] == RangeSchema(
+        start=datetime(2022, 1, 5, 0, 0, 0), end=datetime(2022, 1, 5, 0, 0, 0)
+    )
+    assert blocks[3] == RangeSchema(
+        start=datetime(2022, 1, 7, 0, 0, 0), end=datetime(2022, 1, 7, 0, 0, 0)
+    )
+
+
+def test_get_outliers_in_context_for_site(fake_uow, sensor_repository):
     outliers = {
-        "site": [
+        "threshold": [
             # Block 1
             SensorDataSchema(value=0, time=datetime(2022, 1, 1, 0, 0, 0)),
             SensorDataSchema(value=0, time=datetime(2022, 1, 1, 1, 0, 0)),
@@ -75,18 +109,118 @@ def test_get_block_ranges():
         ]
     }
 
-    blocks = SensorService.get_block_ranges(outliers)
-    assert len(blocks["site"]) == 4
+    data = SensorService.get_outliers_in_context_for_site(
+        fake_uow, outliers, "CLDP0001", Series.pm25
+    )
 
-    assert blocks["site"][0] == RangeSchema(
-        start=datetime(2022, 1, 1, 0, 0, 0), end=datetime(2022, 1, 1, 2, 0, 0)
+
+def test_get_outliers_in_context(fake_uow, sensor_repository):
+    data = SensorService.get_outliers_in_context(fake_uow, Series.pm25)
+
+
+def test_reshape_outliers_by_site_code():
+    input_data = {
+        "threshold": {
+            "site1": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 1, 0, 0)),
+            ],
+            "site2": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 2, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 3, 0, 0)),
+            ],
+        },
+        "z_score": {
+            "site1": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 4, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 5, 0, 0)),
+            ],
+            "site2": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 6, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 7, 0, 0)),
+            ],
+        },
+    }
+
+    output_data = SensorService.reshape_outliers_by_site_code(input_data)
+
+    assert output_data == {
+        "site1": {
+            "threshold": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 1, 0, 0)),
+            ],
+            "z_score": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 4, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 5, 0, 0)),
+            ],
+        },
+        "site2": {
+            "threshold": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 2, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 3, 0, 0)),
+            ],
+            "z_score": [
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 6, 0, 0)),
+                SensorDataSchema(value=0, time=datetime(2022, 1, 1, 7, 0, 0)),
+            ],
+        },
+    }
+
+
+def test_merge_blocks():
+    """Asserts that the block merge function works"""
+    # Check it handles empty lists
+    assert SensorService.merge_blocks([]) == []
+
+    blocks = [
+        RangeSchema(
+            start=datetime(2022, 1, 1, 0, 0, 0), end=datetime(2022, 1, 1, 2, 0, 0)
+        ),
+        RangeSchema(
+            start=datetime(2022, 1, 1, 1, 0, 0), end=datetime(2022, 1, 1, 3, 0, 0)
+        ),
+        RangeSchema(
+            start=datetime(2022, 1, 1, 1, 0, 0), end=datetime(2022, 1, 1, 4, 0, 0)
+        ),
+        RangeSchema(
+            start=datetime(2022, 1, 1, 6, 0, 0), end=datetime(2022, 1, 1, 8, 0, 0)
+        ),
+    ]
+
+    merged_blocks = SensorService.merge_blocks(blocks)
+
+    assert len(merged_blocks) == 2
+    assert merged_blocks[0] == RangeSchema(
+        start=datetime(2022, 1, 1, 0, 0, 0), end=datetime(2022, 1, 1, 4, 0, 0)
     )
-    assert blocks["site"][1] == RangeSchema(
-        start=datetime(2022, 1, 3, 0, 0, 0), end=datetime(2022, 1, 3, 2, 0, 0)
+    assert merged_blocks[1] == RangeSchema(
+        start=datetime(2022, 1, 1, 6, 0, 0), end=datetime(2022, 1, 1, 8, 0, 0)
     )
-    assert blocks["site"][2] == RangeSchema(
-        start=datetime(2022, 1, 5, 0, 0, 0), end=datetime(2022, 1, 5, 0, 0, 0)
+
+
+def test_extend_blocks():
+    """Asserts that the blocks can be extended by a day either side and rounded to
+    the nearest day"""
+    # Check it handles empty lists
+    assert SensorService.extend_blocks([]) == []
+
+    blocks = [
+        RangeSchema(
+            start=datetime(2022, 1, 3, 1, 2, 3, 4), end=datetime(2022, 1, 4, 4, 5, 6, 7)
+        ),
+        RangeSchema(
+            start=datetime(2022, 1, 3, 13, 2, 3, 4),
+            end=datetime(2022, 1, 3, 14, 5, 6, 7),
+        ),
+    ]
+
+    extended_blocks = SensorService.extend_blocks(blocks)
+
+    assert len(extended_blocks) == 2
+    assert extended_blocks[0] == RangeSchema(
+        start=datetime(2022, 1, 2, 0, 0, 0, 0), end=datetime(2022, 1, 6, 0, 0, 0, 0)
     )
-    assert blocks["site"][3] == RangeSchema(
-        start=datetime(2022, 1, 7, 0, 0, 0), end=datetime(2022, 1, 7, 0, 0, 0)
+    assert extended_blocks[1] == RangeSchema(
+        start=datetime(2022, 1, 2, 0, 0, 0, 0), end=datetime(2022, 1, 5, 0, 0, 0, 0)
     )

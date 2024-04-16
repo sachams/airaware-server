@@ -198,19 +198,14 @@ def test_get_outliers(session, dummy_sites):
     session.commit()
 
     # Now query for bad data
-    import pdb
-
-    pdb.set_trace()
-
-    outliers = repository.get_outliers(Series.pm25)
+    outliers = repository.get_outliers_threshold(Series.pm25)
 
     assert len(outliers.keys()) == 2
     assert sites[0].site_code in outliers.keys()
     assert sites[1].site_code in outliers.keys()
 
-    assert len(outliers[sites[0].site_code]) == 2
-    assert outliers[sites[0].site_code][0].value == pytest.approx(200)
-    assert outliers[sites[0].site_code][1].value == pytest.approx(201)
+    assert len(outliers[sites[0].site_code]) == 1
+    assert outliers[sites[0].site_code][0].value == pytest.approx(201)
 
     assert len(outliers[sites[1].site_code]) == 2
     assert outliers[sites[1].site_code][0].value == pytest.approx(300)

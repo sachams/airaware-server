@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from app_config import daily_limits
 from server.schemas import (
+    OutlierBlockSchema,
     RangeSchema,
     SensorDataCreateSchema,
     SensorDataSchema,
@@ -17,6 +18,7 @@ from server.service.processing_result import ProcessingResult
 from server.source.remote_sources import RemoteSources
 from server.types import Classification, Frequency, Series, Source
 from server.unit_of_work.abstract_unit_of_work import AbstractUnitOfWork
+from server.utils import round_datetime_to_day
 
 
 class SensorService:
@@ -301,56 +303,192 @@ class SensorService:
 
     @staticmethod
     def get_outliers_in_context(
-        uow: AbstractUnitOfWork, series: Series
-    ) -> dict[str, tuple[list[SensorDataSchema], list[SensorDataSchema]]]:
-        """Generates and returns data that are considered outliers, along with
-        context (all data points for +/- 1 day)"""
+        uow: AbstractUnitOfWork,
+        series: Series,
+    ) -> dict[str, list[OutlierBlockSchema]]:
         with uow:
+            # 1. Generate outliers for each outlier calculation method (at the moment
+            # we only have threshold) into a dict keyed by site_code
             logging.info("Querying for outlier data")
-            outliers = uow.sensors.get_outliers(series)
+            outliers_by_method = {
+                "threshold": uow.sensors.get_outliers_threshold(series)
+            }
+            outliers_by_site_code = SensorService.reshape_outliers_by_site_code(
+                outliers_by_method
+            )
 
-            logging.info("Calculating block ranges")
-            block_ranges = SensorService.get_block_ranges(outliers)
-
-            logging.info("Adding context")
+            # 2. For each site code, get outliers in context
             outliers_in_context = {}
-            for site_code, range in block_ranges.items():
-                logging.info(f"Querying context data for {site_code}")
-                context_data = uow.sensors.get_data(
-                    series, range.start, range.end, Frequency.hour, [site_code]
+            for site_code, outliers in outliers_by_site_code.items():
+                outliers_in_context[site_code] = (
+                    SensorService.get_outliers_in_context_for_site(
+                        uow, outliers, site_code, series
+                    )
                 )
-                outliers_in_context[site_code] = {
-                    "outliers": outliers[site_code],
-                    "context": context_data,
-                }
 
             return ProcessingResult.SUCCESS_RETRIEVED, outliers_in_context
 
     @staticmethod
-    def get_block_ranges(
-        outliers: dict[str, list[SensorDataSchema]]
-    ) -> dict[str, list[RangeSchema]]:
+    def get_outliers_in_context_for_site(
+        uow: AbstractUnitOfWork,
+        outliers_by_method: dict[str, list[SensorDataSchema]],
+        site_code: str,
+        series: Series,
+    ) -> list[OutlierBlockSchema]:
+        """Generates and returns data that are considered outliers, along with
+        context (all data points for +/- 1 day)"""
+
+        # 1. For each outlier calculation method results, calculate a list of
+        # blocks (ranges) for the data. It's fine to have one big list of blocks
+        # that might overlap, because we will merge them anyway
+        logging.info("Calculating block ranges")
+        blocks = []
+        for _, data in outliers_by_method.items():
+            blocks += SensorService.get_block_ranges(data)
+
+        # 2. Extend each block by a day either side (gives more context when viewing
+        # data)
+        logging.info("Extending blocks")
+        extended_blocks = SensorService.extend_blocks(blocks)
+
+        # 3. Merge any overlapping blocks (note, this will also sort)
+        logging.info("Merging blocks")
+        merged_blocks = SensorService.merge_blocks(extended_blocks)
+
+        # 4. We now have a list of blocks, and each block will have outliers
+        # from at least one calculation method. Go through each block and see
+        # which outlier data can be assigned to that block
+        logging.info("Assigning outlier data to blocks")
+        outlier_blocks: list[OutlierBlockSchema] = []
+
+        for merged_block in merged_blocks:
+            # Create a block with all outlier data and context data
+            outlier_block = OutlierBlockSchema(range=merged_block)
+
+            # Query context (ie, normal data) for this block
+            logging.info(
+                f"Adding context to block {merged_block.start.isoformat()}"
+                f"-{merged_block.end.isoformat()}"
+            )
+            outlier_block.context_data = uow.sensors.get_data(
+                series,
+                merged_block.start,
+                merged_block.end,
+                Frequency.hour,
+                [site_code],
+            )
+
+            # Go through outlier data and assign any points that fall
+            # within the limits of this block
+            logging.info(
+                f"Assigning outlier data to block {merged_block.start.isoformat()}"
+                f"-{merged_block.end.isoformat()}"
+            )
+            for outlier_method, outlier_data in outliers_by_method.items():
+                while (
+                    outlier_data
+                    and outlier_data[0].time >= merged_block.start
+                    and outlier_data[0].time < merged_block.end
+                ):
+                    outlier_block.outlier_data[outlier_method].append(
+                        outlier_data.pop(0)
+                    )
+
+            outlier_blocks.append(outlier_block)
+
+        return outlier_blocks
+
+    @staticmethod
+    def reshape_outliers_by_site_code(
+        outliers_by_method: dict[str, dict[str, list[SensorDataSchema]]],
+    ) -> dict[str, dict[str, list[SensorDataSchema]]]:
+        """Takes a dict that looks like this:
+
+        {
+            "threshold": {"site1": [SensorDataSchema1, SensorDataSchema2],
+                          "site2": [SensorDataSchema3, SensorDataSchema4]},
+            "z_score":   {"site1": [SensorDataSchema5, SensorDataSchema6],
+                          "site2": [SensorDataSchema7, SensorDataSchema8]},
+        }
+
+        and reshapes it to look like this:
+        {
+            "site1": {"threshold": [SensorDataSchema1, SensorDataSchema2],
+                      "z_score":   [SensorDataSchema5, SensorDataSchema6]},
+            "site2": {"threshold": [SensorDataSchema3, SensorDataSchema4],
+                      "z_score":   [SensorDataSchema7, SensorDataSchema8]},
+        }
+        """
+
+        outliers_by_site_code = defaultdict(dict)
+
+        for method, sites in outliers_by_method.items():
+            for site_code, site_data in sites.items():
+                outliers_by_site_code[site_code][method] = site_data
+
+        return outliers_by_site_code
+
+    @staticmethod
+    def merge_blocks(source: list[RangeSchema]) -> list[RangeSchema]:
+        """Merges a list of ranges so that there are no overlapping blocks"""
+        if len(source) == 0:
+            return []
+
+        source.sort(key=lambda entry: entry.start)
+
+        merged = []
+
+        merged.append(source[0])
+
+        for block in source[1:]:
+            # Check for overlapping interval,
+            # if interval overlap
+            if merged[-1].start <= block.start <= merged[-1].end:
+                merged[-1].end = max(merged[-1].end, block.end)
+            else:
+                merged.append(block)
+
+        return merged
+
+    @staticmethod
+    def extend_blocks(source: list[RangeSchema]) -> list[RangeSchema]:
+        """Extends each block by adding a day each side, and rounding down (start) and up (end)
+        so that each block starts and ends at midnight"""
+        extended = [
+            RangeSchema(
+                start=round_datetime_to_day(
+                    block.start - datetime.timedelta(days=1), True
+                ),
+                end=round_datetime_to_day(
+                    block.end + datetime.timedelta(days=1), False
+                ),
+            )
+            for block in source
+        ]
+
+        return extended
+
+    @staticmethod
+    def get_block_ranges(outliers: list[SensorDataSchema]) -> list[RangeSchema]:
         """Calculates date blocks from the outlier data. An outlier range is defined as any
         series of outlier points that are no more than a day apart."""
-        block_ranges = defaultdict(list)
+        if not outliers:
+            return []
 
-        for site_code, data in outliers.items():
-            start = data[0].time
-            for index, row in enumerate(data):
-                # Grab the next row, if we can
-                next_row = data[index + 1] if index < len(data) - 1 else None
+        block_ranges = []
 
-                if next_row:
-                    if next_row.time - row.time > datetime.timedelta(days=1):
-                        # The next row is more than a day away - close out this block
-                        block_ranges[site_code].append(
-                            RangeSchema(start=start, end=row.time)
-                        )
-                        start = next_row.time
-                else:
-                    # No more next row - close out the block
-                    block_ranges[site_code].append(
-                        RangeSchema(start=start, end=row.time)
-                    )
+        start = outliers[0].time
+        for index, row in enumerate(outliers):
+            # Grab the next row, if we can
+            next_row = outliers[index + 1] if index < len(outliers) - 1 else None
+
+            if next_row:
+                if next_row.time - row.time > datetime.timedelta(days=1):
+                    # The next row is more than a day away - close out this block
+                    block_ranges.append(RangeSchema(start=start, end=row.time))
+                    start = next_row.time
+            else:
+                # No more next row - close out the block
+                block_ranges.append(RangeSchema(start=start, end=row.time))
 
         return block_ranges
