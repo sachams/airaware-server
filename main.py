@@ -197,6 +197,7 @@ def get_geometry_route(
 
 
 @api_router.get("/outlier/{series}", status_code=status.HTTP_200_OK)
+@cache(namespace="api", expire=60 * 60 * 24, key_builder=request_key_builder)  # 1 day
 def get_outliers(
     series: Series,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
@@ -207,7 +208,6 @@ def get_outliers(
             return data
 
 
-# TODO: add API for updating data
 @api_router.post("/resync_data", status_code=status.HTTP_200_OK)
 def resync_data(
     data: SyncSiteSchema,
