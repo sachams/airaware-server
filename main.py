@@ -200,7 +200,7 @@ def get_geometry_route(
 def get_outliers(
     series: Series,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
-) -> dict[str, list[OutlierBlockSchema]]:
+) -> list[dict]:
     """Returns data that might be questionable. Ie, above a threshold for the specified series"""
     match SensorService.get_outliers_in_context(uow, series):
         case ProcessingResult.SUCCESS_RETRIEVED, data:

@@ -305,7 +305,7 @@ class SensorService:
     def get_outliers_in_context(
         uow: AbstractUnitOfWork,
         series: Series,
-    ) -> dict[str, list[OutlierBlockSchema]]:
+    ) -> list[dict]:
         with uow:
             # 1. Generate outliers for each outlier calculation method (at the moment
             # we only have threshold) into a dict keyed by site_code
@@ -326,7 +326,11 @@ class SensorService:
                     )
                 )
 
-            return ProcessingResult.SUCCESS_RETRIEVED, outliers_in_context
+            reshaped_data = []
+            for site_code, outliers in outliers_in_context.items():
+                reshaped_data.append({"site_code": site_code, "outliers": outliers})
+
+            return ProcessingResult.SUCCESS_RETRIEVED, reshaped_data
 
     @staticmethod
     def get_outliers_in_context_for_site(
@@ -363,7 +367,7 @@ class SensorService:
 
         for merged_block in merged_blocks:
             # Create a block with all outlier data and context data
-            outlier_block = OutlierBlockSchema(range=merged_block)
+            outlier_block = OutlierBlockSchema(site_code=site_code, range=merged_block)
 
             # Query context (ie, normal data) for this block
             logging.info(
