@@ -344,6 +344,7 @@ class SensorRepository(AbstractSensorRepository):
             .filter(SensorDataModel.series == series.name)
             .filter(SensorDataModel.value > outlier_threshold[series.name])
             .filter(SiteModel.is_enabled == True)
+            .order_by(SensorDataModel.time)
         )
 
         data = defaultdict(list)

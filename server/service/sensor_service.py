@@ -333,6 +333,15 @@ class SensorService:
             return ProcessingResult.SUCCESS_RETRIEVED, reshaped_data
 
     @staticmethod
+    def log_blocks(
+        blocks: list[RangeSchema],
+        site_code: str,
+        series: str,
+    ) -> None:
+        for block in blocks:
+            logging.info(f"[{site_code}:{series}] {block.start}-{block.end}")
+
+    @staticmethod
     def get_outliers_in_context_for_site(
         uow: AbstractUnitOfWork,
         outliers_by_method: dict[str, list[SensorDataSchema]],
@@ -345,24 +354,28 @@ class SensorService:
         # 1. For each outlier calculation method results, calculate a list of
         # blocks (ranges) for the data. It's fine to have one big list of blocks
         # that might overlap, because we will merge them anyway
-        logging.info("Calculating block ranges")
+        logging.info(f"[{site_code}:{series}] Calculating block ranges")
         blocks = []
         for _, data in outliers_by_method.items():
             blocks += SensorService.get_block_ranges(data)
 
+        SensorService.log_blocks(blocks, site_code, series)
+
         # 2. Extend each block by a day either side (gives more context when viewing
         # data)
-        logging.info("Extending blocks")
+        logging.info(f"[{site_code}:{series}] Extending blocks")
         extended_blocks = SensorService.extend_blocks(blocks)
+        SensorService.log_blocks(extended_blocks, site_code, series)
 
         # 3. Merge any overlapping blocks (note, this will also sort)
-        logging.info("Merging blocks")
+        logging.info(f"[{site_code}:{series}] Merging blocks")
         merged_blocks = SensorService.merge_blocks(extended_blocks)
+        SensorService.log_blocks(merged_blocks, site_code, series)
 
         # 4. We now have a list of blocks, and each block will have outliers
         # from at least one calculation method. Go through each block and see
         # which outlier data can be assigned to that block
-        logging.info("Assigning outlier data to blocks")
+        logging.info(f"[{site_code}:{series}] Assigning outlier data to blocks")
         outlier_blocks: list[OutlierBlockSchema] = []
 
         for merged_block in merged_blocks:
@@ -371,7 +384,7 @@ class SensorService:
 
             # Query context (ie, normal data) for this block
             logging.info(
-                f"Adding context to block {merged_block.start.isoformat()}"
+                f"[{site_code}:{series}] Adding context to block {merged_block.start.isoformat()}"
                 f"-{merged_block.end.isoformat()}"
             )
             outlier_block.context_data = uow.sensors.get_data(
@@ -385,8 +398,8 @@ class SensorService:
             # Go through outlier data and assign any points that fall
             # within the limits of this block
             logging.info(
-                f"Assigning outlier data to block {merged_block.start.isoformat()}"
-                f"-{merged_block.end.isoformat()}"
+                f"[{site_code}:{series}] Assigning outlier data to block "
+                f"{merged_block.start.isoformat()}-{merged_block.end.isoformat()}"
             )
             for outlier_method, outlier_data in outliers_by_method.items():
                 while (
