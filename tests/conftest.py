@@ -1,20 +1,139 @@
+import datetime
 import os
 from unittest import mock
 
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
+from sqlalchemy_utils.functions import create_database, database_exists, drop_database
 
+import app_config
+from alembic.command import upgrade
+from alembic.config import Config
 from main import app, get_unit_of_work
-from server.database import SessionLocal
+from server.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
 from server.repository.fake_geometry_repository import FakeGeometryRepository
 from server.repository.fake_request_repository import FakeRequestRepository
 from server.repository.fake_sensor_repository import FakeSensorRepository
+from server.schemas import SensorDataCreateSchema, SiteCreateSchema
+from server.types import Classification, Series, SiteStatus, Source
 from server.unit_of_work.fake_unit_of_work import FakeUnitOfWork
 
 
+def run_migrations():
+
+    config = Config(file_="alembic.ini")
+
+    # upgrade the database to the latest revision
+    upgrade(config, "head")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def db():
+    """Session-wide test database."""
+
+    if database_exists(SQLALCHEMY_DATABASE_URL):
+        drop_database(SQLALCHEMY_DATABASE_URL)
+
+    create_database(SQLALCHEMY_DATABASE_URL)
+
+    # Apply migrations to the database
+    run_migrations()
+
+
 @pytest.fixture()
-def session():
-    return SessionLocal()
+def session(db):
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = SessionLocal(bind=connection)
+
+    # Begin a nested transaction (using SAVEPOINT).
+    nested = connection.begin_nested()
+
+    # If the application code calls session.commit, it will end the nested
+    # transaction. Need to start a new one when that happens.
+    @sa.event.listens_for(session, "after_transaction_end")
+    def end_savepoint(session, transaction):
+        nonlocal nested
+        if not nested.is_active:
+            nested = connection.begin_nested()
+
+    yield session
+
+    # Rollback the overall transaction, restoring the state before the test ran.
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture
+def dummy_sites():
+    return [
+        SiteCreateSchema(
+            site_code="A123",
+            name="Test site 1",
+            status=SiteStatus.healthy,
+            latitude=50.0,
+            longitude=0.01,
+            site_type=Classification.urban_background,
+            source=Source.breathe_london,
+            is_enabled=True,
+        ),
+        SiteCreateSchema(
+            site_code="A456",
+            name="Test site 2",
+            status=SiteStatus.healthy,
+            latitude=50.0,
+            longitude=0.01,
+            site_type=Classification.urban_background,
+            source=Source.breathe_london,
+            is_enabled=True,
+        ),
+    ]
+
+
+@pytest.fixture
+def create_dummy_sparse_data():
+    def generate_data_func(sites):
+        # Add some dummy data - sparse points
+        data = []
+        for index, site in enumerate(sites):
+            for day in range(1, 3):
+                for hour in range(0, 5):
+                    data.append(
+                        SensorDataCreateSchema(
+                            site_id=site.site_id,
+                            series=Series.pm25,
+                            value=day * hour * (index + 1),
+                            time=datetime.datetime(2022, 1, day, hour, 0, 0, 0),
+                        )
+                    )
+
+        return data
+
+    yield generate_data_func
+
+
+@pytest.fixture
+def create_dummy_heatmap_data():
+    def generate_data_func(sites):
+        # Add some dummy data - lots of points for heatmap
+        data = []
+        for index, site in enumerate(sites):
+            for day in range(1, 32):
+                for hour in range(0, 24):
+                    data.append(
+                        SensorDataCreateSchema(
+                            site_id=site.site_id,
+                            series=Series.pm25,
+                            value=day * hour * (index + 1),
+                            time=datetime.datetime(2023, 1, day, hour, 0, 0, 0),
+                        )
+                    )
+
+        return data
+
+    yield generate_data_func
 
 
 @pytest.fixture()

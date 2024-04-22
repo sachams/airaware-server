@@ -45,6 +45,30 @@ def sync_all(resync, start):
 
 
 @cli.command()
+@click.argument("series", required=True, type=click.Choice(Series))
+@click.option("--filename", required=False, default="outlier_data.csv")
+def get_outliers(series, filename):
+    """Lists all outlier data"""
+    uow = UnitOfWork()
+    result, outliers = SensorService.get_outliers(uow, series)
+
+    # Display a summary of the bad data
+    # for site_code, data in bad_data.items():
+    #     print(f"Site code: {site_code} - {len(data)} bad data points")
+    # for row in data:
+    #     print(row)
+
+    # And dump it out to a CSV file
+    print(f"Writing to {series}_{filename}")
+    with open(f"{series}_{filename}", "w") as dest_file:
+        for site_code, data in outliers.items():
+            for row in data:
+                dest_file.write(
+                    f"{site_code},{series.name},{row.time.strftime('%d/%m/%Y %H:%M')},{row.value}\n"
+                )
+
+
+@cli.command()
 @click.argument("src_filename", required=True, type=click.Path(exists=True))
 @click.argument("dest_filename", required=True, type=click.Path())
 @click.argument("src_proj", default="EPSG:27700")
@@ -65,7 +89,7 @@ def wrapped(year):
     import json
 
     from pydantic.json import pydantic_encoder
-    
+
     uow = UnitOfWork()
 
     match SensorService.generate_wrapped(uow, year):

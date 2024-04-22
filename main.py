@@ -34,7 +34,12 @@ from exception_handlers import (
 )
 from middleware import log_request_middleware
 from server.logging import configure_logging
-from server.schemas import SensorDataSchema, SiteAverageSchema, SyncSiteSchema
+from server.schemas import (
+    OutlierBlockSchema,
+    SensorDataSchema,
+    SiteAverageSchema,
+    SyncSiteSchema,
+)
 from server.service import (
     GeometryService,
     ProcessingResult,
@@ -153,10 +158,11 @@ def get_site_average_route(
     series: Series,
     start: datetime.datetime,
     end: datetime.datetime,
+    enrich: bool = False,
     uow: AbstractUnitOfWork = Depends(get_unit_of_work),
 ) -> list[SiteAverageSchema]:
     """Returns the list of all sites with the average levels for the periods given"""
-    match SensorService.get_site_average(uow, series, start, end):
+    match SensorService.get_site_average(uow, series, start, end, enrich):
         case ProcessingResult.SUCCESS_RETRIEVED, items:
             return items
 
@@ -188,6 +194,18 @@ def get_geometry_route(
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND, detail=f"Unknown geometry {name}"
             )
+
+
+@api_router.get("/outlier/{series}", status_code=status.HTTP_200_OK)
+@cache(namespace="api", expire=60 * 60 * 24, key_builder=request_key_builder)  # 1 day
+def get_outliers(
+    series: Series,
+    uow: AbstractUnitOfWork = Depends(get_unit_of_work),
+) -> list[dict]:
+    """Returns data that might be questionable. Ie, above a threshold for the specified series"""
+    match SensorService.get_outliers_in_context(uow, series):
+        case ProcessingResult.SUCCESS_RETRIEVED, data:
+            return data
 
 
 @api_router.post("/resync_data", status_code=status.HTTP_200_OK)

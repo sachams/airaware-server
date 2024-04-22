@@ -5,9 +5,9 @@ from server.types.site_status import SiteStatus
 from server.types.source import Source
 
 __all__ = [
+    "Classification",
+    "Frequency",
+    "Series",
     "SiteStatus",
     "Source",
-    "Classification",
-    "Series",
-    "Frequency",
 ]

@@ -7,6 +7,7 @@ from pydantic import TypeAdapter
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
+from app_config import outlier_threshold
 from server.models import SensorDataModel, SiteModel
 from server.repository.abstract_sensor_repository import AbstractSensorRepository
 from server.schemas import (
@@ -39,8 +40,8 @@ class SensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
         frequency: Frequency,
-        codes: list[str] | None,
-        types: list[Classification] | None,
+        codes: list[str] | None = None,
+        types: list[Classification] | None = None,
     ) -> list[SensorDataSchema]:
         """Reads data from the datastore, averaging across the specified sites. If no
         sites are specified, it averages across all sites.
@@ -200,7 +201,9 @@ class SensorRepository(AbstractSensorRepository):
         result = self.session.execute(query)
         data = defaultdict(list)
         for row in result:
-            data[row.site_code].append(HeatmapSchema(hour=row.hour, day=row.day, value=row.value))
+            data[row.site_code].append(
+                HeatmapSchema(hour=row.hour, day=row.day, value=row.value)
+            )
 
         return data
 
@@ -209,7 +212,7 @@ class SensorRepository(AbstractSensorRepository):
         series: Series,
         start: datetime.datetime,
         end: datetime.datetime,
-        threshold: float
+        threshold: float,
     ) -> dict[str, BreachSchema]:
         """Gets the number of days the daily average is above the speficied threshold for each
         site.
@@ -217,7 +220,7 @@ class SensorRepository(AbstractSensorRepository):
         daily_avg_subquery = (
             select(
                 SiteModel.site_code,
-                func.date_trunc("day", SensorDataModel.time).label('date'),
+                func.date_trunc("day", SensorDataModel.time).label("date"),
                 func.avg(SensorDataModel.value).label("average"),
             )
             .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
@@ -233,7 +236,7 @@ class SensorRepository(AbstractSensorRepository):
         breach_query = (
             select(
                 daily_avg_subquery.c.site_code,
-                func.count(daily_avg_subquery.c.date).label("count")
+                func.count(daily_avg_subquery.c.date).label("count"),
             )
             .filter(daily_avg_subquery.c.average > threshold)
             .group_by(daily_avg_subquery.c.site_code)
@@ -242,18 +245,20 @@ class SensorRepository(AbstractSensorRepository):
         )
 
         breach_final_query = (
-            select(
-                SiteModel.site_code,
-                breach_query.c.count
+            select(SiteModel.site_code, breach_query.c.count)
+            .join_from(
+                SiteModel,
+                breach_query,
+                SiteModel.site_code == breach_query.c.site_code,
+                isouter=True,
             )
-            .join_from(SiteModel, breach_query, SiteModel.site_code == breach_query.c.site_code, isouter=True)
             .filter(SiteModel.is_enabled == True)
         )
 
         ok_query = (
             select(
                 daily_avg_subquery.c.site_code,
-                func.count(daily_avg_subquery.c.date).label("count")
+                func.count(daily_avg_subquery.c.date).label("count"),
             )
             .filter(daily_avg_subquery.c.average <= threshold)
             .group_by(daily_avg_subquery.c.site_code)
@@ -262,11 +267,13 @@ class SensorRepository(AbstractSensorRepository):
         )
 
         ok_final_query = (
-            select(
-                SiteModel.site_code,
-                ok_query.c.count
+            select(SiteModel.site_code, ok_query.c.count)
+            .join_from(
+                SiteModel,
+                ok_query,
+                SiteModel.site_code == ok_query.c.site_code,
+                isouter=True,
             )
-            .join_from(SiteModel, ok_query, SiteModel.site_code == ok_query.c.site_code, isouter=True)
             .filter(SiteModel.is_enabled == True)
         )
 
@@ -301,13 +308,14 @@ class SensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
     ) -> dict[str, RankSchema]:
-        """Gets the average over the period, and the rank of each site (1 = lowest)
-        """
+        """Gets the average over the period, and the rank of each site (1 = lowest)"""
         query = (
             select(
                 SiteModel.site_code,
                 func.avg(SensorDataModel.value).label("average"),
-                func.row_number().over(order_by=func.avg(SensorDataModel.value)).label("rank")
+                func.row_number()
+                .over(order_by=func.avg(SensorDataModel.value))
+                .label("rank"),
             )
             .join(SiteModel)
             .filter(SensorDataModel.series == series.name)
@@ -323,5 +331,26 @@ class SensorRepository(AbstractSensorRepository):
         data = defaultdict(list)
         for row in result:
             data[row.site_code] = RankSchema(rank=row.rank, value=row.average)
+
+        return data
+
+    def get_outliers_threshold(
+        self, series: Series
+    ) -> dict[str, list[SensorDataSchema]]:
+        """Returns arrays of outlier data for the specified series"""
+        query = (
+            select(SiteModel.site_code, SensorDataModel.value, SensorDataModel.time)
+            .join(SiteModel, SiteModel.site_id == SensorDataModel.site_id)
+            .filter(SensorDataModel.series == series.name)
+            .filter(SensorDataModel.value > outlier_threshold[series.name])
+            .filter(SiteModel.is_enabled == True)
+            .order_by(SensorDataModel.time)
+        )
+
+        data = defaultdict(list)
+
+        result = self.session.execute(query)
+        for row in result:
+            data[row.site_code].append(SensorDataSchema(time=row.time, value=row.value))
 
         return data

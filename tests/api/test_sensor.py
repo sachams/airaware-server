@@ -39,9 +39,24 @@ def test_get_site_average(client, snapshot):
 
 
 @pytest.mark.usefixtures("use_fake_uow")
+def test_get_site_average_enriched(client, snapshot):
+    response = client.get(
+        "/site_average/pm25/2022-01-01T10:00:00/2022-02-01T10:00:00?enrich=true"
+    )
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == snapshot
+
+    response = client.get(
+        "/site_average/pm25/2022-01-01T10:00:00/2022-02-01T10:00:00?enrich=false"
+    )
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == snapshot
+
+
+@pytest.mark.usefixtures("use_fake_uow")
 def test_get_sites(client, snapshot):
     response = client.get("/sites")
-    
+
     assert response.status_code == HTTPStatus.OK
     assert response.json() == snapshot
 
@@ -54,3 +69,11 @@ def test_get_site_average_db_exception(client, mocker, sensor_repository):
 
     response = client.get("/site_average/pm25/2022-01-01T10:00:00/2022-02-01T10:00:00")
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.usefixtures("use_fake_uow")
+def test_get_outliers(client, snapshot):
+    response = client.get("/outlier/pm25")
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == snapshot

@@ -15,7 +15,10 @@ from server.types import Classification, Frequency, Series, SiteStatus, Source
 
 class FakeSensorRepository(AbstractSensorRepository):
     def __init__(self):
-        self.data = []
+        self.data = [
+            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
+            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
+        ]
 
     def write_data(self, data: list[SensorDataCreateSchema]) -> None:
         self.data = data
@@ -26,13 +29,10 @@ class FakeSensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
         frequency: Frequency,
-        codes: list[str],
-        types: list[Classification],
+        codes: list[str] | None = None,
+        types: list[Classification] | None = None,
     ) -> list[SensorDataSchema]:
-        return [
-            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
-            SensorDataSchema(time=datetime.datetime(2020, 6, 5, 3, 2, 1), value=1.23),
-        ]
+        return self.data
 
     def delete_data(self, series: Series, site_id: int) -> None:
         raise NotImplementedError
@@ -64,7 +64,7 @@ class FakeSensorRepository(AbstractSensorRepository):
                 start_date=datetime.datetime(2020, 6, 5, 3, 2, 1),
                 end_date=datetime.datetime(2022, 6, 5, 3, 2, 1),
                 borough="Lambeth",
-                is_enabled=True
+                is_enabled=True,
             ),
             SiteSchema(
                 site_id=2,
@@ -80,7 +80,7 @@ class FakeSensorRepository(AbstractSensorRepository):
                 start_date=datetime.datetime(2022, 6, 5, 3, 2, 1),
                 end_date=None,
                 borough="Lambeth",
-                is_enabled=True
+                is_enabled=True,
             ),
             SiteSchema(
                 site_id=3,
@@ -96,13 +96,12 @@ class FakeSensorRepository(AbstractSensorRepository):
                 start_date=datetime.datetime(2022, 6, 5, 3, 2, 1),
                 end_date=None,
                 borough="Lambeth",
-                is_enabled=False
+                is_enabled=False,
             ),
         ]
 
     def get_site(self, site_code: str) -> SiteSchema:
         raise NotImplementedError
-
 
     def get_heatmap(
         self,
@@ -113,22 +112,53 @@ class FakeSensorRepository(AbstractSensorRepository):
         """Gets heatmap data for the specified series by hour of day and day of week, for all
         sites.
         """
-        return {'CLDP0001': [HeatmapSchema(hour=0, day=1, value=0.0), HeatmapSchema(hour=1, day=1, value=1.0), HeatmapSchema(hour=2, day=1, value=2.0), HeatmapSchema(hour=3, day=1, value=3.0), HeatmapSchema(hour=4, day=1, value=4.0), HeatmapSchema(hour=0, day=2, value=0.0), HeatmapSchema(hour=1, day=2, value=2.0), HeatmapSchema(hour=2, day=2, value=4.0), HeatmapSchema(hour=3, day=2, value=6.0), HeatmapSchema(hour=4, day=2, value=8.0)], 'CLDP0002': [HeatmapSchema(hour=0, day=1, value=0.0), HeatmapSchema(hour=1, day=1, value=1.5), HeatmapSchema(hour=2, day=1, value=3.0), HeatmapSchema(hour=3, day=1, value=4.5), HeatmapSchema(hour=4, day=1, value=6.0), HeatmapSchema(hour=0, day=2, value=0.0), HeatmapSchema(hour=1, day=2, value=3.0), HeatmapSchema(hour=2, day=2, value=6.0), HeatmapSchema(hour=3, day=2, value=9.0), HeatmapSchema(hour=4, day=2, value=12.0)]}
+        return {
+            "CLDP0001": [
+                HeatmapSchema(hour=0, day=1, value=0.0),
+                HeatmapSchema(hour=1, day=1, value=1.0),
+                HeatmapSchema(hour=2, day=1, value=2.0),
+                HeatmapSchema(hour=3, day=1, value=3.0),
+                HeatmapSchema(hour=4, day=1, value=4.0),
+                HeatmapSchema(hour=0, day=2, value=0.0),
+                HeatmapSchema(hour=1, day=2, value=2.0),
+                HeatmapSchema(hour=2, day=2, value=4.0),
+                HeatmapSchema(hour=3, day=2, value=6.0),
+                HeatmapSchema(hour=4, day=2, value=8.0),
+            ],
+            "CLDP0002": [
+                HeatmapSchema(hour=0, day=1, value=0.0),
+                HeatmapSchema(hour=1, day=1, value=1.5),
+                HeatmapSchema(hour=2, day=1, value=3.0),
+                HeatmapSchema(hour=3, day=1, value=4.5),
+                HeatmapSchema(hour=4, day=1, value=6.0),
+                HeatmapSchema(hour=0, day=2, value=0.0),
+                HeatmapSchema(hour=1, day=2, value=3.0),
+                HeatmapSchema(hour=2, day=2, value=6.0),
+                HeatmapSchema(hour=3, day=2, value=9.0),
+                HeatmapSchema(hour=4, day=2, value=12.0),
+            ],
+        }
 
     def get_breach(
         self,
         series: Series,
         start: datetime.datetime,
         end: datetime.datetime,
-        threshold: float
+        threshold: float,
     ) -> dict[str, BreachSchema]:
         """Gets the number of days the daily average is above the speficied threshold for each
         site.
         """
         if series == Series.pm25:
-            return {'CLDP0002': {'breach': 1, 'ok': 1, 'no_data': 363}, 'CLDP0001': {'ok': 2, 'breach': 0, 'no_data': 363}}
+            return {
+                "CLDP0002": {"breach": 1, "ok": 1, "no_data": 363},
+                "CLDP0001": {"ok": 2, "breach": 0, "no_data": 363},
+            }
         else:
-            return {'CLDP0002': {'breach': 0, 'ok': 0, 'no_data': 365}, 'CLDP0001':  {'breach': 0, 'ok': 0, 'no_data': 365}}
+            return {
+                "CLDP0002": {"breach": 0, "ok": 0, "no_data": 365},
+                "CLDP0001": {"breach": 0, "ok": 0, "no_data": 365},
+            }
 
     def get_rank(
         self,
@@ -136,6 +166,42 @@ class FakeSensorRepository(AbstractSensorRepository):
         start: datetime.datetime,
         end: datetime.datetime,
     ) -> dict[str, RankSchema]:
-        """Gets the average over the period, and the rank of each site (1 = lowest)
-        """
-        return {'CLDP0001': RankSchema(rank=1, value=3.0), 'CLDP0002': RankSchema(rank=2, value=4.5)}
+        """Gets the average over the period, and the rank of each site (1 = lowest)"""
+        return {
+            "CLDP0001": RankSchema(rank=1, value=3.0),
+            "CLDP0002": RankSchema(rank=2, value=4.5),
+        }
+
+    def get_outliers_threshold(
+        self, series: Series
+    ) -> dict[str, list[SensorDataSchema]]:
+        return {
+            "CLDP0001": [
+                # Block 1
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 2, 0, 0)),
+                # Block 2
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 2, 0, 0)),
+                # Block 3
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 5, 0, 0, 0)),
+                # Block 4
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 7, 0, 0, 0)),
+            ],
+            "CLDP0002": [
+                # Block 1
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 1, 2, 0, 0)),
+                # Block 2
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 0, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 1, 0, 0)),
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 3, 2, 0, 0)),
+                # Block 3
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 5, 0, 0, 0)),
+                # Block 4
+                SensorDataSchema(value=0, time=datetime.datetime(2022, 1, 7, 0, 0, 0)),
+            ],
+        }
