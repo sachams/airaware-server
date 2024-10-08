@@ -18,7 +18,7 @@ class BreatheLondon:
         self.retry_pause = 1
         self.client = httpx.Client(timeout=30)
         self.api_key = api_key
-        self.base_url = "https://api.breathelondon.org/api"
+        self.base_url = "https://erg-api-fskubf2mtq-ew.a.run.app/api"
         self.borough_mapper = BoroughMapper()
 
     @property
