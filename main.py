@@ -24,7 +24,6 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from fastapi_cache.decorator import cache
 from redis.asyncio.connection import ConnectionPool
-from starlette.exceptions import HTTPException
 
 import app_config
 from exception_handlers import (
@@ -35,7 +34,6 @@ from exception_handlers import (
 from middleware import log_request_middleware
 from server.logging import configure_logging
 from server.schemas import (
-    OutlierBlockSchema,
     SensorDataSchema,
     SiteAverageSchema,
     SyncSiteSchema,
@@ -52,6 +50,8 @@ from server.unit_of_work.unit_of_work import UnitOfWork
 
 # Configure logging
 configure_logging()
+
+logging.info(f"Using BreatheLondon API key {app_config.breathe_london_api_key}")
 
 app = FastAPI()
 api_router = APIRouter()
